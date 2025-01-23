@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Literal
 import numpy as np
 from latex2sympy2 import latex2sympy
 from sympy import latex, simplify
+import re
 
 from .qwen_math_parser import extract_answer, strip_string
 
@@ -54,6 +55,13 @@ def memoized_canonical_form(expression: str, timeout_seconds: int = 3) -> str:
         str: The canonical form of the expression or the original expression as fallback.
     """
     # Check if the result is already cached
+    answer = re.search(r'\\boxed\{(.+?)\}', expression)
+    if not answer:
+        fallback = strip_string(expression)
+        shared_cache[expression] = fallback  # Cache the fallback result
+        return fallback
+    expression = answer.group(1)
+    
     if expression in shared_cache:
         return shared_cache[expression]
 
@@ -233,6 +241,7 @@ def pass_at_k(n: int, c: int, k: int) -> float:
 
 
 def compute_pass_at_k(x, k):
+    # TODO @mihir check if this is correct
     """
     Computes pass@k for predictions, using canonical forms to group and compare answers.
 
@@ -248,10 +257,23 @@ def compute_pass_at_k(x, k):
         raise ValueError("No predictions found")
     if x["answer"] == "":
         raise ValueError("Answer is empty")
-
+    #================================
+    #TODO @mihir remove
+    # print(f"Answer: {x['answer']}")
+    # print("Predictions:")
+    # for pred in x["preds"]:
+        # print(pred)
+    #================================
     # Compute the canonical form of the correct answer
     canonical_answer = memoized_canonical_form(x["answer"])
-
+    #================================
+    #TODO @mihir remove
+    # print(f"Canonical Answer: {canonical_answer}")
+    # print("Canonical Predictions:")
+    # for pred in x["preds"]:
+        # canonical_pred = memoized_canonical_form(pred)
+        # print(canonical_pred)
+    #================================
     # Compute the count of predictions matching the canonical answer
     c = sum(memoized_canonical_form(pred) == canonical_answer for pred in x["preds"])
 
@@ -265,6 +287,8 @@ def compute_level(
     """Computes the difficulty level (1-5) of a problem based on the given metric and quintiles.
 
     Easier problems have a a higher metric value, so the levels are reversed (1 is the easiest, 5 is the hardest)."""
+    if x[metric] == 0.0:
+        return {f"level_{name}": 6}
     if x[metric] < quintiles[0]:
         return {f"level_{name}": 5}
     elif x[metric] < quintiles[1]:

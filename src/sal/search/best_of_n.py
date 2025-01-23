@@ -46,11 +46,14 @@ def best_of_n(x, config: Config, llm: LLM, prm: PRM):
     # Initialize empty lists for completions and completion tokens
     completions = [[] for _ in range(len(x["problem"]))]
     completion_tokens = [[] for _ in range(len(x["problem"]))]
+    log_probs = [[] for _ in range(len(x["problem"]))]
 
+    # TODO @mihir check the hyperparameters
     sampling_params = SamplingParams(
         temperature=config.temperature,
         max_tokens=config.max_tokens,
         top_p=config.top_p,
+        logprobs=config.log_probs,
         n=1,  # Since we've already duplicated the prompt_token_ids, we only need to generate 1 completion per prompt
     )
 
@@ -75,6 +78,14 @@ def best_of_n(x, config: Config, llm: LLM, prm: PRM):
             for r in responses[i * config.n : (i + 1) * config.n]
             for output in r.outputs
         ]
+        for r in responses[i * config.n : (i + 1) * config.n]:
+            for output in r.outputs:
+                log_probs_per_token = []
+                for token_distr in output.logprobs:
+                    log_prob_objects = token_distr.values()
+                    log_prob_values = [lp_obj.logprob for lp_obj in  log_prob_objects]
+                    log_probs_per_token.append(log_prob_values) 
+                log_probs[i].append(log_probs_per_token)
 
     # Check we generated the correct number of completions for each prompt
     for c in completions:
@@ -93,5 +104,5 @@ def best_of_n(x, config: Config, llm: LLM, prm: PRM):
     x["scores"] = scores
     x["pred"] = pred
     x["completion_tokens"] = completion_tokens
-
+    x["log_probs"] = log_probs
     return x

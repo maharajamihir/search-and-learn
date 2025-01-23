@@ -158,7 +158,7 @@ class RLHFFlow(PRM):
         questions: list[str],
         outputs: list[list[str]],
         batched: bool = True,
-        batch_size=8,
+        batch_size=4,
     ) -> list[list[float]]:
         if batched is True:
             return self._score_batched(questions, outputs, batch_size=batch_size)

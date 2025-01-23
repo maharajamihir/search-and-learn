@@ -15,6 +15,7 @@
 
 
 import math
+import numpy as np
 from typing import Literal
 
 from datasets import Dataset
@@ -27,6 +28,8 @@ from sal.utils.math import (
     compute_weighted_pred,
     extract_completion_answers,
     subsample_completions,
+    compute_level,
+    compute_pass_at_k,
 )
 
 
@@ -47,6 +50,46 @@ def score(dataset: Dataset, config: Config) -> Dataset:
     dataset = dataset.map(
         lambda x: {"agg_scores": [aggregate_scores(s, "last") for s in x["scores"]]}
     )
+    
+    # Compute mean score for each example
+    dataset = dataset.map(
+        lambda x: {"mean_score": sum(x["agg_scores"]) / len(x["agg_scores"])},
+        desc="Computing mean scores"
+    )
+    
+    # Compute pass@1 for each example
+    dataset = dataset.map(
+        lambda x: compute_pass_at_k({"preds": x["completions"], "answer": x["answer"]}, k=1),
+        num_proc=config.num_proc,
+        desc="Computing pass@1"
+    )
+    
+    # Calculate quintiles for both metrics
+    mean_scores = dataset["mean_score"]
+    pass_at_1_scores = dataset["pass@1"]
+    mean_quintiles = [np.percentile(mean_scores, q) for q in [20, 40, 60, 80]]
+    pass_quintiles = [np.percentile(pass_at_1_scores, q) for q in [20, 40, 60, 80]]
+    # Compute difficulty levels
+    dataset = dataset.map(
+        compute_level,
+        fn_kwargs={
+            "metric": "mean_score",
+            "name": "mean",
+            "quintiles": mean_quintiles
+        },
+        desc="Computing mean score levels"
+    )
+    
+    dataset = dataset.map(
+        compute_level,
+        fn_kwargs={
+            "metric": "pass@1",
+            "name": "pass",
+            "quintiles": pass_quintiles
+        },
+        desc="Computing pass@1 levels"
+    )
+
     subsets = [2**i for i in range(config.n) if 2**i <= config.n]
     for n in tqdm(subsets, desc="Computing majority & weighted predictions"):
         dataset = dataset.map(
