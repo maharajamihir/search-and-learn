@@ -78,6 +78,4 @@ def save_dataset(dataset, config):
             counter += 1
 
         dataset.to_json(output_file, lines=True)
-        logger.info(
-            f"Saved completions to {config.output_dir}/{config.approach}_completions.jsonl"
-        )
+        logger.info(f"Saved completions to {output_file}")

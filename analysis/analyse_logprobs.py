@@ -1,280 +1,42 @@
 import json
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 from tqdm import tqdm
 from typing import List, Dict, Any
+import msgpack
 from pathlib import Path
 
+from sal.utils.score import aggregate_scores
 
-def plot_per_problem_logprobs(results: List[Dict[str, Any]], output_dir: Path, show_std: bool = True):
-    # Group results by unique_id
-    problems = []
-    means = []
-    stds = []
-    for r in results:
-        problems.append(r['unique_id'])
-        means.append(-r['avg_by_rank'][0])  # rank 1 logprobs
-        stds.append(r['stds_by_rank'][0])  # rank 1 standard deviations
-    # Create the plot
-    plt.figure(figsize=(12, 6))
-    x = range(len(problems))
-    if show_std:
-        plt.bar(x, means, yerr=stds, capsize=5, alpha=0.7, color='blue', 
-                label='Mean with ±1 std dev')
-    else:
-        plt.bar(x, means, alpha=0.7, color='blue', label='Mean')
-    
-
-    
-    plt.title('Average Negative Log Probability per Problem')
-    plt.xlabel('Problem')
-    plt.ylabel('Average Negative Log Probability')
-    plt.grid(True)
-    plt.legend()
-    
-    # Set problem names as x-tick labels
-    plt.xticks(x, problems, rotation=45, ha='right')
-    if len(problems) > 20:
-        # Show only every nth label to avoid overcrowding
-        plt.gca().set_xticks(x[::len(x)//20])
-    
-    plt.tight_layout()
-    plt.savefig(output_dir / 'per_problem_logprobs.png')
-    plt.close()
-
-def plot_per_problem_entropy(results: List[Dict[str, Any]], output_dir: Path):
-    # Group results by unique_id
-    problems = []
-    means = []
-    for r in results:
-        problems.append(r['unique_id'])
-        means.append(r['avg_entropy'])
-    
-    # Calculate mean and std for each problem
-    
-    # Create the plot
-    plt.figure(figsize=(12, 6))
-    x = range(len(problems))
-    plt.bar(x, means, alpha=0.7, color='red', label='Mean')
-    
-    plt.title('Average Entropy per Problem')
-    plt.xlabel('Problem')
-    plt.ylabel('Average Entropy')
-    plt.grid(True)
-    plt.legend()
-    
-    # Set problem names as x-tick labels
-    plt.xticks(x, problems, rotation=45, ha='right')
-    if len(problems) > 20:
-        # Show only every nth label to avoid overcrowding
-        plt.gca().set_xticks(x[::len(x)//20])
-    
-    plt.tight_layout()
-    plt.savefig(output_dir / 'per_problem_entropy.png')
-    plt.close()
-
-def plot_per_problem_level(results: List[Dict[str, Any]], output_dir: Path):
-    # Group results by unique_id and get level
-    problems = [r['unique_id'] for r in results]
-    levels = [r['level'] for r in results]
-    
-    # Create the plot
-    plt.figure(figsize=(12, 6))
-    x = range(len(problems))
-    plt.bar(x, levels, alpha=0.7, color='green')
-    
-    plt.title('Problem Level per Problem')
-    plt.xlabel('Problem')
-    plt.ylabel('Level')
-    plt.grid(True)
-    
-    # Set problem names as x-tick labels
-    plt.xticks(x, problems, rotation=45, ha='right')
-    if len(problems) > 20:
-        # Show only every nth label to avoid overcrowding
-        plt.gca().set_xticks(x[::len(x)//20])
-    
-    plt.tight_layout()
-    plt.savefig(output_dir / 'per_problem_level.png')
-    plt.close()
-
-def plot_pass_at_1(results: List[Dict[str, Any]], output_dir: Path):
-    # Extract pass@1 data
-    problems = [r['unique_id'] for r in results]
-    pass_at_1 = [r['pass@1'] for r in results]
-    print(f"Number of pass@1 values greater than 0: {sum(1 for p in pass_at_1 if p > 0.)}")
-    # Create the plot
-    plt.figure(figsize=(12, 6))
-    x = range(len(problems))
-    plt.bar(x, pass_at_1, alpha=0.7, color='purple')
-    
-    plt.title('Pass@1 per Problem')
-    plt.xlabel('Problem')
-    plt.ylabel('Pass@1')
-    plt.grid(True)
-    
-    # Set problem names as x-tick labels
-    plt.xticks(x, problems, rotation=45, ha='right')
-    if len(problems) > 20:
-        plt.gca().set_xticks(x[::len(x)//20])
-    
-    plt.tight_layout()
-    plt.savefig(output_dir / 'pass_at_1.png')
-    plt.close()
-
-def plot_mean_score(results: List[Dict[str, Any]], output_dir: Path):
-    # Extract mean score data
-    problems = [r['unique_id'] for r in results]
-    mean_scores = [r['mean_score'] for r in results]
-    
-    # Create the plot
-    plt.figure(figsize=(12, 6))
-    x = range(len(problems))
-    plt.bar(x, mean_scores, alpha=0.7, color='orange')
-    
-    plt.title('Mean Score per Problem')
-    plt.xlabel('Problem')
-    plt.ylabel('Mean Score')
-    plt.grid(True)
-    
-    # Set problem names as x-tick labels
-    plt.xticks(x, problems, rotation=45, ha='right')
-    if len(problems) > 20:
-        plt.gca().set_xticks(x[::len(x)//20])
-    
-    plt.tight_layout()
-    plt.savefig(output_dir / 'mean_score.png')
-    plt.close()
-
-def plot_level_mean(results: List[Dict[str, Any]], output_dir: Path):
-    # Extract level mean data
-    problems = [r['unique_id'] for r in results]
-    level_means = [r['level_mean'] for r in results]
-    
-    # Create the plot
-    plt.figure(figsize=(12, 6))
-    x = range(len(problems))
-    plt.bar(x, level_means, alpha=0.7, color='cyan')
-    
-    plt.title('Level Mean per Problem')
-    plt.xlabel('Problem')
-    plt.ylabel('Level Mean')
-    plt.grid(True)
-    
-    # Set problem names as x-tick labels
-    plt.xticks(x, problems, rotation=45, ha='right')
-    if len(problems) > 20:
-        plt.gca().set_xticks(x[::len(x)//20])
-    
-    plt.tight_layout()
-    plt.savefig(output_dir / 'level_mean.png')
-    plt.close()
-
-def plot_level_pass(results: List[Dict[str, Any]], output_dir: Path):
-    # Extract level pass data
-    problems = [r['unique_id'] for r in results]
-    level_pass = [r['level_pass'] for r in results]
-    
-    # Create the plot
-    plt.figure(figsize=(12, 6))
-    x = range(len(problems))
-    plt.bar(x, level_pass, alpha=0.7, color='magenta')
-    
-    plt.title('Level Pass per Problem')
-    plt.xlabel('Problem')
-    plt.ylabel('Level Pass')
-    plt.grid(True)
-    
-    # Set problem names as x-tick labels
-    plt.xticks(x, problems, rotation=45, ha='right')
-    if len(problems) > 20:
-        plt.gca().set_xticks(x[::len(x)//20])
-    
-    plt.tight_layout()
-    plt.savefig(output_dir / 'level_pass.png')
-    plt.close()
-
-def plot_entropy_vs_level_mean(results: List[Dict[str, Any]], output_dir: Path):
-    entropies = [r['avg_entropy'] for r in results]
-    level_means = [r['level_mean'] for r in results]
-    
-    plt.figure(figsize=(12, 6))
-    plt.scatter(level_means, entropies, alpha=0.7, color='blue')
-    
-    plt.title('Entropy vs Level Mean')
-    plt.xlabel('Level Mean')
-    plt.ylabel('Entropy')
-    plt.grid(True)
-    
-    plt.tight_layout()
-    plt.savefig(output_dir / 'entropy_vs_level_mean.png')
-    plt.close()
-
-def plot_entropy_vs_level_pass(results: List[Dict[str, Any]], output_dir: Path):
-    entropies = [r['avg_entropy'] for r in results]
-    level_pass = [r['level_pass'] for r in results]
-    
-    plt.figure(figsize=(12, 6))
-    plt.scatter(level_pass, entropies, alpha=0.7, color='green')
-    
-    plt.title('Entropy vs Level Pass')
-    plt.xlabel('Level Pass')
-    plt.ylabel('Entropy')
-    plt.grid(True)
-    
-    plt.tight_layout()
-    plt.savefig(output_dir / 'entropy_vs_level_pass.png')
-    plt.close()
-
-def plot_logprobs_vs_level_mean(results: List[Dict[str, Any]], output_dir: Path):
-    avg_logprobs = [-r['avg_logprob_per_token'] for r in results]
-    level_means = [r['level_mean'] for r in results]
-    
-    plt.figure(figsize=(12, 6))
-    plt.scatter(level_means, avg_logprobs, alpha=0.7, color='red')
-    
-    plt.title('Neg Logprobs vs Level Mean')
-    plt.xlabel('Level Mean')
-    plt.ylabel('Average Neg Logprob per Token')
-    plt.grid(True)
-    
-    plt.tight_layout()
-    plt.savefig(output_dir / 'logprobs_vs_level_mean.png')
-    plt.close()
-
-def plot_logprobs_vs_level_pass(results: List[Dict[str, Any]], output_dir: Path):
-    avg_logprobs = [-r['avg_logprob_per_token'] for r in results]
-    level_pass = [r['level_pass'] for r in results]
-    
-    plt.figure(figsize=(12, 6))
-    plt.scatter(level_pass, avg_logprobs, alpha=0.7, color='purple')
-    
-    plt.title('Neg Logprobs vs Level Pass')
-    plt.xlabel('Level Pass')
-    plt.ylabel('Average Neg Logprob per Token')
-    plt.grid(True)
-    
-    plt.tight_layout()
-    plt.savefig(output_dir / 'logprobs_vs_level_pass.png')
-    plt.close()
-
-
+def moving_average(data, window_size):
+    """Calculate the simple moving average of a list of numbers."""
+    return np.convolve(data, np.ones(window_size) / window_size, mode='valid')
 
 def plot_entropy_vs_mean_score(results: List[Dict[str, Any]], output_dir: Path):
     entropies = [r['avg_entropy'] for r in results]
     mean_scores = [r['mean_score'] for r in results if r['mean_score'] is not None]
     
     plt.figure(figsize=(12, 6))
-    plt.scatter(mean_scores, entropies, alpha=0.7, color='orange')
+    plt.scatter(entropies, mean_scores, alpha=0.7, color='orange')
+        
+    # Calculate mean of entropies for each unique mean_score
+    unique_scores = np.unique(mean_scores)
+    mean_entropies_per_score = [np.mean([entropies[i] for i in range(len(mean_scores)) if mean_scores[i] == score]) for score in unique_scores]
     
-    plt.title('Entropy vs Mean Score')
-    plt.xlabel('Mean Score')
-    plt.ylabel('Entropy')
+    # Apply simple moving average
+    window_size = 5  # You can adjust the window size for smoothing
+    if len(mean_entropies_per_score) >= window_size:
+        smooth_y = moving_average(mean_entropies_per_score, window_size)
+        smooth_x = unique_scores[(window_size - 1):]  # Adjust x to match the length of smooth_y
+        plt.plot(smooth_x, smooth_y, color='red', linestyle='--', label='SMA of Entropy per Mean Score')
+     
+    plt.title('Mean Score vs Entropy')
+    plt.xlabel('Entropy')
+    plt.ylabel('Mean Score')
     plt.grid(True)
     
     plt.tight_layout()
-    plt.savefig(output_dir / 'entropy_vs_mean_score.png')
+    plt.savefig(output_dir / 'mean_score_vs_entropy.png')
     plt.close()
 
 def plot_entropy_vs_pass_at_1(results: List[Dict[str, Any]], output_dir: Path):
@@ -283,38 +45,88 @@ def plot_entropy_vs_pass_at_1(results: List[Dict[str, Any]], output_dir: Path):
     
     plt.figure(figsize=(12, 6))
     plt.scatter(pass_at_1, entropies, alpha=0.7, color='brown')
+
+    # Calculate mean of entropies for each unique pass_at_1
+    unique_pass_at_1 = np.unique(pass_at_1)
+    mean_entropies_per_pass = [np.mean([entropies[i] for i in range(len(pass_at_1)) if pass_at_1[i] == pass_value]) for pass_value in unique_pass_at_1]
     
-    plt.title('Entropy vs Pass@1')
+    # Apply simple moving average
+    window_size = 5  # You can adjust the window size for smoothing
+    if len(mean_entropies_per_pass) >= window_size:
+        smooth_y = moving_average(mean_entropies_per_pass, window_size)
+        smooth_x = unique_pass_at_1[(window_size - 1):]  # Adjust x to match the length of smooth_y
+        plt.plot(smooth_x, smooth_y, color='red', linestyle='--', label='SMA of Entropy per Pass@1')
+   
+    plt.title('Pass@1 vs Entropy')
     plt.xlabel('Pass@1')
     plt.ylabel('Entropy')
     plt.grid(True)
     
     plt.tight_layout()
-    plt.savefig(output_dir / 'entropy_vs_pass_at_1.png')
+    plt.savefig(output_dir / 'pass_at_1_vs_entropy.png')
     plt.close()
 
-def plot_logprobs_vs_mean_score(results: List[Dict[str, Any]], output_dir: Path):
-    avg_logprobs = [r['avg_logprob_per_token'] for r in results]
-    mean_scores = [r['mean_score'] for r in results if r['mean_score'] is not None]
+def plot_varentropy_vs_pass_at_1(results: List[Dict[str, Any]], output_dir: Path):
+    # Calculate variance of entropy for each result
+    varentropies = [np.var(r['entropies']) for r in results]
+    pass_at_1 = [r['pass@1'] for r in results if r['pass@1'] is not None]
     
     plt.figure(figsize=(12, 6))
-    plt.scatter(mean_scores, avg_logprobs, alpha=0.7, color='pink')
+    plt.scatter(pass_at_1, varentropies, alpha=0.7, color='teal')
     
-    plt.title('Logprobs vs Mean Score')
-    plt.xlabel('Mean Score')
-    plt.ylabel('Average Logprob per Token')
+    plt.title('Pass@1 vs Varentropy')
+    plt.xlabel('Pass@1')
+    plt.ylabel('Varentropy')
     plt.grid(True)
     
     plt.tight_layout()
-    plt.savefig(output_dir / 'logprobs_vs_mean_score.png')
+    plt.savefig(output_dir / 'pass_at_1_vs_varentropy.png')
+    plt.close()
+
+def plot_logprobs_vs_mean_score(results: List[Dict[str, Any]], output_dir: Path):
+    avg_logprobs = [-r['avg_by_rank'][0] for r in results]
+    mean_scores = [r['mean_score'] for r in results if r['mean_score'] is not None]
+    
+    plt.figure(figsize=(12, 6))
+    plt.scatter(avg_logprobs, mean_scores, alpha=0.7, color='pink')
+    
+    # Calculate mean of avg_logprobs for each unique mean_score
+    unique_scores = np.unique(mean_scores)
+    mean_logprobs_per_score = [np.mean([avg_logprobs[i] for i in range(len(mean_scores)) if mean_scores[i] == score]) for score in unique_scores]
+    
+    # Apply simple moving average
+    window_size = 5  # You can adjust the window size for smoothing
+    if len(mean_logprobs_per_score) >= window_size:
+        smooth_y = moving_average(mean_logprobs_per_score, window_size)
+        smooth_x = unique_scores[(window_size - 1):]  # Adjust x to match the length of smooth_y
+        plt.plot(smooth_x, smooth_y, color='red', linestyle='--', label='SMA of Mean Logprob per Mean Score')
+    
+    plt.title('Mean Score vs Logprobs')
+    plt.xlabel('Average Logprob per Token')
+    plt.ylabel('Mean Score')
+    plt.grid(True)
+    
+    plt.tight_layout()
+    plt.savefig(output_dir / 'mean_score_vs_logprobs.png')
     plt.close()
 
 def plot_logprobs_vs_pass_at_1(results: List[Dict[str, Any]], output_dir: Path):
-    avg_logprobs = [r['avg_logprob_per_token'] for r in results]
+    avg_logprobs = [-r['avg_by_rank'][0] for r in results]
     pass_at_1 = [r['pass@1'] for r in results if r['pass@1'] is not None]
     
     plt.figure(figsize=(12, 6))
     plt.scatter(pass_at_1, avg_logprobs, alpha=0.7, color='grey')
+
+    # Calculate mean of avg_logprobs for each unique pass_at_1
+    unique_pass_at_1 = np.unique(pass_at_1)
+    mean_logprobs_per_pass = [np.mean([avg_logprobs[i] for i in range(len(pass_at_1)) if pass_at_1[i] == pass_value]) for pass_value in unique_pass_at_1]
+    
+    # Apply simple moving average
+    window_size = 5  # You can adjust the window size for smoothing
+    if len(mean_logprobs_per_pass) >= window_size:
+        smooth_y = moving_average(mean_logprobs_per_pass, window_size)
+        smooth_x = unique_pass_at_1[(window_size - 1):]  # Adjust x to match the length of smooth_y
+        plt.plot(smooth_x, smooth_y, color='red', linestyle='--', label='SMA of Mean Logprob per Pass@1')
     
     plt.title('Logprobs vs Pass@1')
     plt.xlabel('Pass@1')
@@ -325,41 +137,963 @@ def plot_logprobs_vs_pass_at_1(results: List[Dict[str, Any]], output_dir: Path):
     plt.savefig(output_dir / 'logprobs_vs_pass_at_1.png')
     plt.close()
 
+def plot_difficulty_scalar(results: List[Dict[str, Any]], output_dir: Path, percentile: float = 0.01):
+    # Calculate the average of the lowest 25% of rank 0 tokens
+    log_probs = [r['original_logprobs'] for r in results]
+    avg_logprobs = []
+    for problem in range(len(log_probs)):
+        rank_probs = []
+        for gen in range(len(log_probs[problem])):
+            for token in range(len(log_probs[problem][gen])):
+                rank_probs.append(log_probs[problem][gen][token][0])
+        rank_probs.sort()
+        lowest_quartile = rank_probs[:int(len(rank_probs) * percentile)]
+        avg = float(np.mean(lowest_quartile))
+        std = float(np.std(rank_probs))
+        avg_logprobs.append(avg * std)
+
+    pass_at_1 = [r['pass@1'] for r in results if r['pass@1'] is not None]
+    
+    plt.figure(figsize=(12, 6))
+    ax1 = plt.gca()  # Get the current axis
+    ax2 = ax1.twinx()  # Create a twin axis sharing the x-axis
+
+    # Normalize the target data
+    from sklearn.preprocessing import StandardScaler
+    scaler_y = StandardScaler()
+    avg_logprobs_normalized = scaler_y.fit_transform(np.array(avg_logprobs).reshape(-1, 1)).flatten()
+
+    ax1.scatter(pass_at_1, avg_logprobs, alpha=0.7, color='blue', label='Difficulty')
+    
+    # Perform linear regression on the data
+    from sklearn.linear_model import LinearRegression
+    from sklearn.metrics import mean_squared_error, mean_absolute_error
+
+    # Reshape data for sklearn
+    X = np.array(pass_at_1).reshape(-1, 1)
+
+    # Create and fit the model
+    model = LinearRegression()
+    model.fit(X, avg_logprobs_normalized)
+
+    # Predict using the model
+    y_pred = model.predict(X)
+
+    # Plot the linear regression line
+    ax1.plot(pass_at_1, scaler_y.inverse_transform(y_pred.reshape(-1, 1)), color='black', linestyle='-', label='Linear Regression')
+
+    # Calculate and print the mean squared error (L2 loss) and mean absolute error (L1 loss)
+    l2_loss = mean_squared_error(avg_logprobs_normalized, y_pred)
+    l1_loss = mean_absolute_error(avg_logprobs_normalized, y_pred)
+    print(f"Linear Regression L2 Loss: {l2_loss}, L1 Loss: {l1_loss}")
+
+    # Calculate mean of avg_logprobs and std_logprobs for each unique pass_at_1
+    unique_pass_at_1 = np.unique(pass_at_1)
+    mean_logprobs_per_pass = [np.mean([avg_logprobs[i] for i in range(len(pass_at_1)) if pass_at_1[i] == pass_value]) for pass_value in unique_pass_at_1]
+
+    # Apply simple moving average
+    window_size = 5  # You can adjust the window size for smoothing
+    if len(mean_logprobs_per_pass) >= window_size:
+        smooth_y_avg = moving_average(mean_logprobs_per_pass, window_size)
+        smooth_x = unique_pass_at_1[(window_size - 1):]  # Adjust x to match the length of smooth_y
+        ax1.plot(smooth_x, smooth_y_avg, color='red', linestyle='--', label='SMA of Mean Difficulty per Pass@1')
+
+    ax1.set_title(f'Lowest Quartile Logprobs vs Pass@1. L2 loss: {l2_loss:.4f}, L1 loss: {l1_loss:.4f}')
+    ax1.set_xlabel('Pass@1')
+    ax1.set_ylabel(f'Logprob per Token (Lowest {percentile*100.0}%)')
+    ax2.set_ylabel('Standard Deviation of Logprob')
+    ax1.grid(True)
+
+    # Combine legends from both axes
+    lines, labels = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines + lines2, labels + labels2, loc='upper left')
+
+    plt.tight_layout()
+    plt.savefig(output_dir / f'lowest_{int(percentile*100)}_logprobs_vs_pass_at_1.png')
+    plt.close()
+
+def plot_lowest_quartile_logprobs_vs_pass_at_1(results: List[Dict[str, Any]], output_dir: Path, percentile: float = 0.25):
+    # Calculate the average of the lowest 25% of rank 0 tokens
+    log_probs = [r['original_logprobs'] for r in results]
+    avg_logprobs = []
+    std_logprobs = []  # New list to store standard deviations
+    for problem in range(len(log_probs)):
+        rank_probs = []
+        for gen in range(len(log_probs[problem])):
+            for token in range(len(log_probs[problem][gen])):
+                rank_probs.append(log_probs[problem][gen][token][0])
+        rank_probs.sort()
+        if int(len(rank_probs) * percentile) > 0.0:
+            lowest_quartile = rank_probs[:int(len(rank_probs) * percentile)]
+        else:
+            lowest_quartile = [rank_probs[0]] # take the min
+        avg = float(np.mean(lowest_quartile))
+        std = float(np.std(lowest_quartile))
+        avg_logprobs.append(avg)
+        std_logprobs.append(std)  # Append standard deviation
+
+    pass_at_1 = [r['pass@1'] for r in results if r['pass@1'] is not None]
+    
+    plt.figure(figsize=(12, 6))
+    ax1 = plt.gca()  # Get the current axis
+    ax2 = ax1.twinx()  # Create a twin axis sharing the x-axis
+
+    ax1.scatter(pass_at_1, avg_logprobs, alpha=0.7, color='blue', label='Avg Logprob')
+    # ax2.scatter(pass_at_1, std_logprobs, alpha=0.7, color='grey', label='Std Logprob')  # Plot std deviations
+
+    # Perform linear regression on the data
+    from sklearn.linear_model import LinearRegression
+    from sklearn.metrics import mean_squared_error, mean_absolute_error
+    from sklearn.preprocessing import StandardScaler
+
+    # Reshape data for sklearn
+    X = np.array(avg_logprobs).reshape(-1, 1)
+    y = np.array(pass_at_1)
+
+    if y.size == 0:
+        print("No valid logprobs available for regression.")
+        return None
+
+    # Normalize the target data
+    scaler_y = StandardScaler()
+    y_normalized = scaler_y.fit_transform(y.reshape(-1, 1)).flatten()
+
+    # Create and fit the model
+    model = LinearRegression()
+    model.fit(X, y_normalized)
+
+    # Predict using the model
+    y_pred = model.predict(X)
+
+    # Plot the linear regression line
+    ax1.plot(scaler_y.inverse_transform(y_pred.reshape(-1, 1)), avg_logprobs, color='black', linestyle='-', label='Linear Regression')
+
+    # Calculate and print the mean squared error (L2 loss) and mean absolute error (L1 loss)
+    l2_loss = mean_squared_error(y_normalized, y_pred)
+    l1_loss = mean_absolute_error(y_normalized, y_pred)
+    print(f"Linear Regression L2 Loss: {l2_loss}, L1 Loss: {l1_loss}")
+
+    # Calculate mean of avg_logprobs and std_logprobs for each unique pass_at_1
+    unique_pass_at_1 = np.unique(pass_at_1)
+    mean_logprobs_per_pass = [np.mean([avg_logprobs[i] for i in range(len(pass_at_1)) if pass_at_1[i] == pass_value]) for pass_value in unique_pass_at_1]
+    mean_std_per_pass = [np.mean([std_logprobs[i] for i in range(len(pass_at_1)) if pass_at_1[i] == pass_value]) for pass_value in unique_pass_at_1]  # Mean std
+
+    # Apply simple moving average
+    window_size = 5  # You can adjust the window size for smoothing
+    if len(mean_logprobs_per_pass) >= window_size:
+        smooth_y_avg = moving_average(mean_logprobs_per_pass, window_size)
+        smooth_y_std = moving_average(mean_std_per_pass, window_size)  # Smooth std
+        smooth_x = unique_pass_at_1[(window_size - 1):]  # Adjust x to match the length of smooth_y
+        ax1.plot(smooth_x, smooth_y_avg, color='red', linestyle='--', label='SMA of Mean Logprob per Pass@1')
+        ax2.plot(smooth_x, smooth_y_std, color='green', linestyle='--', label='SMA of Std Logprob per Pass@1')  # Plot smoothed std
+
+    ax1.set_title(f'Lowest Quartile Logprobs vs Pass@1. L2 loss: {l2_loss:.4f}, L1 loss: {l1_loss:.4f}')
+    ax1.set_xlabel('Pass@1')
+    ax1.set_ylabel(f'Logprob per Token (Lowest {percentile*100.0}%)')
+    ax2.set_ylabel('Standard Deviation of Logprob')
+    ax1.grid(True)
+
+    # Combine legends from both axes
+    lines, labels = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines + lines2, labels + labels2, loc='upper left')
+
+    plt.tight_layout()
+    plt.savefig(output_dir / f'lowest_{percentile*100.}_logprobs_vs_pass_at_1.png')
+    plt.close()
+
+def _plot_lowest_quartile_logprobs_vs_pass_at_1(results: List[Dict[str, Any]], output_dir: Path, percentile: float = 0.25):
+    # Calculate the average of the lowest 25% of rank 0 tokens
+    log_probs = [r['original_logprobs'] for r in results]
+    avg_logprobs = []
+    std_logprobs = []  # New list to store standard deviations
+    for problem in range(len(log_probs)):
+        rank_probs = []
+        for gen in range(len(log_probs[problem])):
+            for token in range(len(log_probs[problem][gen])):
+                rank_probs.append(log_probs[problem][gen][token][0])
+        rank_probs.sort()
+        if int(len(rank_probs) * percentile) > 0.0:
+            lowest_quartile = rank_probs[:int(len(rank_probs) * percentile)]
+        else:
+            lowest_quartile = [rank_probs[0]] # take the min
+        avg = float(np.mean(lowest_quartile))
+        std = float(np.std(lowest_quartile))
+        avg_logprobs.append(avg)
+        std_logprobs.append(std)  # Append standard deviation
+
+    pass_at_1 = [r['pass@1'] for r in results if r['pass@1'] is not None]
+    
+    plt.figure(figsize=(12, 6))
+    ax1 = plt.gca()  # Get the current axis
+    ax2 = ax1.twinx()  # Create a twin axis sharing the x-axis
+
+    ax1.scatter(avg_logprobs, pass_at_1, alpha=0.7, color='blue', label='Pass@1')
+    # ax2.scatter(avg_logprobs, std_logprobs, alpha=0.7, color='grey', label='Std Logprob')  # Plot std deviations
+
+    # Perform linear regression on the data
+    from sklearn.linear_model import LinearRegression
+    from sklearn.metrics import mean_squared_error, mean_absolute_error
+    from sklearn.preprocessing import StandardScaler
+
+    # Reshape data for sklearn
+    X = np.array(avg_logprobs).reshape(-1, 1)
+    y = np.array(pass_at_1)
+
+    if y.size == 0:
+        print("No valid logprobs available for regression.")
+        return None
+
+    # Normalize the target data
+    scaler_y = StandardScaler()
+    y_normalized = scaler_y.fit_transform(y.reshape(-1, 1)).flatten()
+
+    # Create and fit the model
+    model = LinearRegression()
+    model.fit(X, y_normalized)
+
+    # Predict using the model
+    y_pred = model.predict(X)
+
+    # Plot the linear regression line
+    ax1.plot(avg_logprobs, scaler_y.inverse_transform(y_pred.reshape(-1, 1)), color='black', linestyle='-', label='Linear Regression')
+
+    # Calculate and print the mean squared error (L2 loss) and mean absolute error (L1 loss)
+    l2_loss = mean_squared_error(y_normalized, y_pred)
+    l1_loss = mean_absolute_error(y_normalized, y_pred)
+    print(f"Linear Regression L2 Loss: {l2_loss}, L1 Loss: {l1_loss}")
+
+    # Calculate mean of pass_at_1 and std_logprobs for each unique avg_logprob
+    unique_avg_logprobs = np.unique(avg_logprobs)
+    mean_pass_per_logprob = [np.mean([pass_at_1[i] for i in range(len(avg_logprobs)) if avg_logprobs[i] == logprob_value]) for logprob_value in unique_avg_logprobs]
+    mean_std_per_logprob = [np.mean([std_logprobs[i] for i in range(len(avg_logprobs)) if avg_logprobs[i] == logprob_value]) for logprob_value in unique_avg_logprobs]  # Mean std
+
+    # Apply simple moving average
+    window_size = 5  # You can adjust the window size for smoothing
+    if len(mean_pass_per_logprob) >= window_size:
+        smooth_y_avg = moving_average(mean_pass_per_logprob, window_size)
+        smooth_y_std = moving_average(mean_std_per_logprob, window_size)  # Smooth std
+        smooth_x = unique_avg_logprobs[(window_size - 1):]  # Adjust x to match the length of smooth_y
+        ax1.plot(smooth_x, smooth_y_avg, color='red', linestyle='--', label='SMA of Pass@1 per Logprob')
+        ax2.plot(smooth_x, smooth_y_std, color='green', linestyle='--', label='SMA of Std Logprob per Logprob')  # Plot smoothed std
+
+    ax1.set_title(f'Pass@1 vs Lowest Quartile Logprobs. L2 loss: {l2_loss:.4f}, L1 loss: {l1_loss:.4f}')
+    ax1.set_xlabel(f'Logprob per Token (Lowest {percentile*100.0}%)')
+    ax1.set_ylabel('Pass@1')
+    ax2.set_ylabel('Standard Deviation of Logprob')
+    ax1.grid(True)
+
+    # Combine legends from both axes
+    lines, labels = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines + lines2, labels + labels2, loc='upper left')
+
+    plt.tight_layout()
+    plt.savefig(output_dir / f'pass_at_1_vs_lowest_{percentile*100.}_logprobs.png')
+    plt.close()
+
+def plot_lowest_quartile_entropy_vs_pass_at_1(results: List[Dict[str, Any]], output_dir: Path, percentile: float = 0.25):
+    # Calculate the average of the lowest 25% of entropy values
+    entropies = [r['entropies'] for r in results]
+    avg_entropies = []
+    std_entropies = []  # New list to store standard deviations
+    for problem in range(len(entropies)):
+        entropies_lst = []
+        for gen in range(len(entropies[problem])):
+            for token in range(len(entropies[problem][gen])):
+                entropies_lst.append(entropies[problem][gen][token])
+        entropies_lst.sort()
+        if int(len(entropies_lst) * percentile) > 0.0:
+            lowest_quartile = entropies_lst[len(entropies_lst) - int(len(entropies_lst) * percentile):]
+        else:
+            lowest_quartile = [entropies_lst[0]] # take the min
+        avg = float(np.mean(lowest_quartile))
+        std = float(np.std(lowest_quartile))
+        avg_entropies.append(avg)
+        std_entropies.append(std)  # Append standard deviation
+
+    pass_at_1 = [r['pass@1'] for r in results if r['pass@1'] is not None]
+    
+    if not avg_entropies or not pass_at_1:
+        print("No data available for plotting.")
+        return None
+
+    plt.figure(figsize=(12, 6))
+    ax1 = plt.gca()  # Get the current axis
+    ax2 = ax1.twinx()  # Create a twin axis sharing the x-axis
+
+    ax1.scatter(pass_at_1, avg_entropies, alpha=0.7, color='orange', label='Avg Entropy')
+    ax2.scatter(pass_at_1, std_entropies, alpha=0.7, color='brown', label='Std Entropy')  # Plot std deviations
+
+    # Perform linear regression on the data
+    from sklearn.linear_model import LinearRegression
+    from sklearn.metrics import mean_squared_error, mean_absolute_error
+    from sklearn.preprocessing import StandardScaler
+
+    # Reshape data for sklearn
+    X = np.array(pass_at_1).reshape(-1, 1)
+    y = np.array(avg_entropies)
+
+    if y.size == 0:
+        print("No valid entropy values available for regression.")
+        return None
+
+    # Normalize the target data
+    scaler_y = StandardScaler()
+    y_normalized = scaler_y.fit_transform(y.reshape(-1, 1)).flatten()
+
+    # Create and fit the model
+    model = LinearRegression()
+    model.fit(X, y_normalized)
+
+    # Predict using the model
+    y_pred = model.predict(X)
+
+    # Plot the linear regression line
+    ax1.plot(pass_at_1, scaler_y.inverse_transform(y_pred.reshape(-1, 1)), color='black', linestyle='-', label='Linear Regression')
+
+    # Calculate and print the mean squared error (L2 loss) and mean absolute error (L1 loss)
+    l2_loss = mean_squared_error(y_normalized, y_pred)
+    l1_loss = mean_absolute_error(y_normalized, y_pred)
+    print(f"Linear Regression L2 Loss: {l2_loss}, L1 Loss: {l1_loss}")
+
+    # Calculate mean of avg_entropies and std_entropies for each unique pass_at_1
+    unique_pass_at_1 = np.unique(pass_at_1)
+    mean_entropy_per_pass = [np.mean([avg_entropies[i] for i in range(len(pass_at_1)) if pass_at_1[i] == pass_value]) for pass_value in unique_pass_at_1]
+    mean_std_per_pass = [np.mean([std_entropies[i] for i in range(len(pass_at_1)) if pass_at_1[i] == pass_value]) for pass_value in unique_pass_at_1]  # Mean std
+
+    # Apply simple moving average
+    window_size = 5  # You can adjust the window size for smoothing
+    if len(mean_entropy_per_pass) >= window_size:
+        smooth_y_avg = moving_average(mean_entropy_per_pass, window_size)
+        smooth_y_std = moving_average(mean_std_per_pass, window_size)  # Smooth std
+        smooth_x = unique_pass_at_1[(window_size - 1):]  # Adjust x to match the length of smooth_y
+        ax1.plot(smooth_x, smooth_y_avg, color='red', linestyle='--', label='SMA of Avg Entropy per Pass@1')
+        ax2.plot(smooth_x, smooth_y_std, color='green', linestyle='--', label='SMA of Std Entropy per Pass@1')  # Plot smoothed std
+
+    ax1.set_title(f'Pass@1 vs Lowest Quartile Entropy. L2 loss: {l2_loss:.4f}, L1 loss: {l1_loss:.4f}')
+    ax1.set_xlabel('Pass@1')
+    ax1.set_ylabel(f'Entropy (Lowest {int(percentile*100)}%)')
+    ax2.set_ylabel('Standard Deviation of Entropy')
+    ax1.grid(True)
+
+    # Combine legends from both axes
+    lines, labels = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines + lines2, labels + labels2, loc='upper left')
+
+    plt.tight_layout()
+    plt.savefig(output_dir / f'pass_at_1_vs_lowest_{percentile*100}_entropy.png')
+    plt.close()
+
+def plot_lowest_quartile_entropy_vs_seq_len(results: List[Dict[str, Any]], output_dir: Path, percentile: float = 0.25):
+    # Calculate the average of the lowest 25% of entropy values
+    entropies = [r['entropies'] for r in results]
+    avg_entropies = []
+    for problem in range(len(entropies)):
+        entropies_lst = []
+        for gen in range(len(entropies[problem])):
+            for token in range(len(entropies[problem][gen])):
+                entropies_lst.append(entropies[problem][gen][token])
+        entropies_lst.sort()
+        if int(len(entropies_lst) * percentile) > 0.0:
+            lowest_quartile = entropies_lst[len(entropies_lst) - int(len(entropies_lst) * percentile):]
+        else:
+            lowest_quartile = [entropies_lst[0]] # take the min
+        avg = float(np.mean(lowest_quartile))
+        avg_entropies.append(avg)
+
+    seq_len = [r['seq_len'] for r in results if r['seq_len'] is not None]
+    
+    if not avg_entropies or not seq_len:
+        print("No data available for plotting.")
+        return None
+
+    plt.figure(figsize=(12, 6))
+    ax1 = plt.gca()  # Get the current axis
+
+    ax1.scatter(seq_len, avg_entropies, alpha=0.7, color='orange', label='Avg Entropy')
+
+    # Perform linear regression on the data
+    from sklearn.linear_model import LinearRegression
+    from sklearn.metrics import mean_squared_error, mean_absolute_error
+    from sklearn.preprocessing import StandardScaler
+
+    # Reshape data for sklearn
+    X = np.array(seq_len).reshape(-1, 1)
+    y = np.array(avg_entropies)
+
+    if y.size == 0:
+        print("No valid entropy values available for regression.")
+        return None
+
+    # Normalize the target data
+    scaler_y = StandardScaler()
+    y_normalized = scaler_y.fit_transform(y.reshape(-1, 1)).flatten()
+
+    # Create and fit the model
+    model = LinearRegression()
+    model.fit(X, y_normalized)
+
+    # Predict using the model
+    y_pred = model.predict(X)
+
+    # Plot the linear regression line
+    ax1.plot(seq_len, scaler_y.inverse_transform(y_pred.reshape(-1, 1)), color='black', linestyle='-', label='Linear Regression')
+
+    # Calculate and print the mean squared error (L2 loss) and mean absolute error (L1 loss)
+    l2_loss = mean_squared_error(y_normalized, y_pred)
+    l1_loss = mean_absolute_error(y_normalized, y_pred)
+    print(f"Linear Regression L2 Loss: {l2_loss}, L1 Loss: {l1_loss}")
+
+    # Calculate mean of avg_entropies for each unique seq_len
+    unique_seq_len = np.unique(seq_len)
+    mean_entropy_per_seq = [np.mean([avg_entropies[i] for i in range(len(seq_len)) if seq_len[i] == seq_value]) for seq_value in unique_seq_len]
+
+    # Apply simple moving average
+    window_size = 5  # You can adjust the window size for smoothing
+    if len(mean_entropy_per_seq) >= window_size:
+        smooth_y_avg = moving_average(mean_entropy_per_seq, window_size)
+        smooth_x = unique_seq_len[(window_size - 1):]  # Adjust x to match the length of smooth_y
+        ax1.plot(smooth_x, smooth_y_avg, color='red', linestyle='--', label='SMA of Avg Entropy per Seq Len')
+
+    ax1.set_xscale('log', base=2)  # Set x-axis to log scale
+    ax1.set_title(f'Seq Len vs Lowest Quartile Entropy. L2 loss: {l2_loss:.4f}, L1 loss: {l1_loss:.4f}')
+    ax1.set_xlabel('Seq Len')
+    ax1.set_ylabel(f'Entropy (Lowest {int(percentile*100)}%)')
+    ax1.grid(True)
+
+    # Combine legends from both axes
+    lines, labels = ax1.get_legend_handles_labels()
+    ax1.legend(lines, labels, loc='upper left')
+
+    plt.tight_layout()
+    plt.savefig(output_dir / f'seq_len_vs_lowest_{percentile*100}_entropy.png')
+    plt.close()
+
+def plot_lowest_quartile_surprise_vs_pass_at_1(results: List[Dict[str, Any]], output_dir: Path, percentile: float = 0.25):
+    # Calculate the average of the lowest 25% of reverse entropy values
+    surprises = [r['surprises'] for r in results]
+    avg_surprises = []
+    std_surprises = []  # New list to store standard deviations
+    for problem in range(len(surprises)):
+        surprises_lst = []
+        for gen in range(len(surprises[problem])):
+            for token in range(len(surprises[problem][gen])):
+                surprises_lst.append(surprises[problem][gen][token])
+        surprises_lst.sort()
+        if int(len(surprises_lst) * percentile) > 0.0:
+            lowest_quartile = surprises_lst[len(surprises_lst) - int(len(surprises_lst) * percentile):]
+        else:
+            lowest_quartile = [surprises_lst[0]] # take the min
+        avg = float(np.mean(lowest_quartile))
+        std = float(np.std(lowest_quartile))
+        avg_surprises.append(avg)
+        std_surprises.append(std)  # Append standard deviation
+
+    pass_at_1 = [r['pass@1'] for r in results if r['pass@1'] is not None]
+    
+    if not avg_surprises or not pass_at_1:
+        print("No data available for plotting.")
+        return None
+
+    plt.figure(figsize=(12, 6))
+    ax1 = plt.gca()  # Get the current axis
+    ax2 = ax1.twinx()  # Create a twin axis sharing the x-axis
+
+    ax1.scatter(pass_at_1, avg_surprises, alpha=0.7, color='orange', label='Avg Surprise')
+    # ax2.scatter(pass_at_1, std_surprises, alpha=0.7, color='brown', label='Std Rev Entropy')  # Plot std deviations
+
+    # Perform linear regression on the data
+    from sklearn.linear_model import LinearRegression
+    from sklearn.metrics import mean_squared_error, mean_absolute_error
+    from sklearn.preprocessing import StandardScaler
+
+    # Reshape data for sklearn
+    X = np.array(pass_at_1).reshape(-1, 1)
+    y = np.array(avg_surprises)
+
+    if y.size == 0:
+        print("No valid reverse entropy values available for regression.")
+        return None
+
+    # Normalize the target data
+    scaler_y = StandardScaler()
+    y_normalized = scaler_y.fit_transform(y.reshape(-1, 1)).flatten()
+
+    # Create and fit the model
+    model = LinearRegression()
+    model.fit(X, y_normalized)
+
+    # Predict using the model
+    y_pred = model.predict(X)
+
+    # Plot the linear regression line
+    ax1.plot(pass_at_1, scaler_y.inverse_transform(y_pred.reshape(-1, 1)), color='black', linestyle='-', label='Linear Regression')
+
+    # Calculate and print the mean squared error (L2 loss) and mean absolute error (L1 loss)
+    l2_loss = mean_squared_error(y_normalized, y_pred)
+    l1_loss = mean_absolute_error(y_normalized, y_pred)
+    print(f"Linear Regression L2 Loss: {l2_loss}, L1 Loss: {l1_loss}")
+
+    # Calculate mean of pass_at_1 and std_surprises for each unique avg_surprise
+    unique_pass_at_1 = np.unique(pass_at_1)
+    mean_surprise_per_pass = [np.mean([avg_surprises[i] for i in range(len(pass_at_1)) if pass_at_1[i] == p]) for p in unique_pass_at_1]
+    mean_std_per_pass = [np.mean([std_surprises[i] for i in range(len(pass_at_1)) if pass_at_1[i] == p]) for p in unique_pass_at_1]  # Mean std
+
+    # Apply simple moving average
+    window_size = 5  # You can adjust the window size for smoothing
+    if len(mean_surprise_per_pass) >= window_size:
+        smooth_y_avg = moving_average(mean_surprise_per_pass, window_size)
+        smooth_y_std = moving_average(mean_std_per_pass, window_size)  # Smooth std
+        smooth_x = unique_pass_at_1[(window_size - 1):]  # Adjust x to match the length of smooth_y
+        ax1.plot(smooth_x, smooth_y_avg, color='red', linestyle='--', label='SMA of Avg Surprise per Pass@1')
+        ax2.plot(smooth_x, smooth_y_std, color='green', linestyle='--', label='SMA of Std Surprise per Pass@1')  # Plot smoothed std
+
+    ax1.set_title(f'Pass@1 vs Lowest Quartile Rev Entropy. L2 loss: {l2_loss:.4f}, L1 loss: {l1_loss:.4f}')
+    ax1.set_xlabel('Pass@1')
+    ax1.set_ylabel(f'Rev Entropy (Lowest {int(percentile*100)}%)')
+    ax2.set_ylabel('Standard Deviation of Rev Entropy')
+    ax1.grid(True)
+
+    # Combine legends from both axes
+    lines, labels = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines + lines2, labels + labels2, loc='upper left')
+
+    plt.tight_layout()
+    plt.savefig(output_dir / f'pass_at_1_vs_lowest_{percentile*100}_surprise.png')
+    plt.close()
+
+def plot_lowest_quartile_surprise_vs_seq_len(results: List[Dict[str, Any]], output_dir: Path, percentile: float = 0.25):
+    # Calculate the average of the lowest 25% of reverse entropy values
+    surprises = [r['surprises'] for r in results]
+    avg_surprises = []
+    std_surprises = []  # New list to store standard deviations
+    for problem in range(len(surprises)):
+        surprises_lst = []
+        for gen in range(len(surprises[problem])):
+            for token in range(len(surprises[problem][gen])):
+                surprises_lst.append(surprises[problem][gen][token])
+        surprises_lst.sort()
+        if int(len(surprises_lst) * percentile) > 0.0:
+            lowest_quartile = surprises_lst[len(surprises_lst) - int(len(surprises_lst) * percentile):]
+        else:
+            lowest_quartile = [surprises_lst[0]] # take the min
+        avg = float(np.mean(lowest_quartile))
+        std = float(np.std(lowest_quartile))
+        avg_surprises.append(avg)
+        std_surprises.append(std)  # Append standard deviation
+
+    seq_len = [r['seq_len'] for r in results if r['seq_len'] is not None]
+    
+    if not avg_surprises or not seq_len:
+        print("No data available for plotting.")
+        return None
+
+    plt.figure(figsize=(12, 6))
+    ax1 = plt.gca()  # Get the current axis
+    ax2 = ax1.twinx()  # Create a twin axis sharing the x-axis
+
+    ax1.scatter(seq_len, avg_surprises, alpha=0.7, color='orange', label='Avg Surprise')
+    # ax2.scatter(seq_len, std_surprises, alpha=0.7, color='brown', label='Std Rev Entropy')  # Plot std deviations
+
+    # Perform linear regression on the data
+    from sklearn.linear_model import LinearRegression
+    from sklearn.metrics import mean_squared_error, mean_absolute_error
+    from sklearn.preprocessing import StandardScaler
+
+    # Reshape data for sklearn
+    X = np.array(seq_len).reshape(-1, 1)
+    y = np.array(avg_surprises)
+
+    if y.size == 0:
+        print("No valid reverse entropy values available for regression.")
+        return None
+
+    # Normalize the target data
+    scaler_y = StandardScaler()
+    y_normalized = scaler_y.fit_transform(y.reshape(-1, 1)).flatten()
+
+    # Create and fit the model
+    model = LinearRegression()
+    model.fit(X, y_normalized)
+
+    # Predict using the model
+    y_pred = model.predict(X)
+
+    # Plot the linear regression line
+    ax1.plot(seq_len, scaler_y.inverse_transform(y_pred.reshape(-1, 1)), color='black', linestyle='-', label='Linear Regression')
+
+    # Calculate and print the mean squared error (L2 loss) and mean absolute error (L1 loss)
+    l2_loss = mean_squared_error(y_normalized, y_pred)
+    l1_loss = mean_absolute_error(y_normalized, y_pred)
+    print(f"Linear Regression L2 Loss: {l2_loss}, L1 Loss: {l1_loss}")
+
+    # Calculate mean of seq_len and std_surprises for each unique avg_surprise
+    unique_seq_len = np.unique(seq_len)
+    mean_surprise_per_seq = [np.mean([avg_surprises[i] for i in range(len(seq_len)) if seq_len[i] == s]) for s in unique_seq_len]
+    mean_std_per_seq = [np.mean([std_surprises[i] for i in range(len(seq_len)) if seq_len[i] == s]) for s in unique_seq_len]  # Mean std
+
+    # Apply simple moving average
+    window_size = 5  # You can adjust the window size for smoothing
+    if len(mean_surprise_per_seq) >= window_size:
+        smooth_y_avg = moving_average(mean_surprise_per_seq, window_size)
+        smooth_y_std = moving_average(mean_std_per_seq, window_size)  # Smooth std
+        smooth_x = unique_seq_len[(window_size - 1):]  # Adjust x to match the length of smooth_y
+        ax1.plot(smooth_x, smooth_y_avg, color='red', linestyle='--', label='SMA of Avg Surprise per Seq Len')
+        ax2.plot(smooth_x, smooth_y_std, color='green', linestyle='--', label='SMA of Std Surprise per Seq Len')  # Plot smoothed std
+
+    ax1.set_xscale('log', base=2)  # Set x-axis to log scale with base 2
+    ax1.set_title(f'Seq Len vs Lowest Quartile Surprise. L2 loss: {l2_loss:.4f}, L1 loss: {l1_loss:.4f}')
+
+    ax1.set_xlabel('Seq Len (Log Scale)')
+    ax1.set_ylabel(f'Surprise (Lowest {int(percentile*100)}%)')
+    ax2.set_ylabel('Standard Deviation of Surprise')
+    ax1.grid(True)
+
+    # Combine legends from both axes
+    lines, labels = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines + lines2, labels + labels2, loc='upper left')
+
+    plt.tight_layout()
+    plt.savefig(output_dir / f'seq_len_vs_lowest_{percentile*100}_surprise.png')
+    plt.close()
+
 def plot_mean_score_vs_pass_at_1(results: List[Dict[str, Any]], output_dir: Path):
     mean_scores = [r['mean_score'] for r in results if r['mean_score'] is not None]
     pass_at_1 = [r['pass@1'] for r in results if r['pass@1'] is not None]
     
+    if not mean_scores or not pass_at_1:
+        print("No data available for plotting.")
+        return None
+
     plt.figure(figsize=(12, 6))
     plt.scatter(pass_at_1, mean_scores, alpha=0.7, color='blue')
     
-    plt.title('Mean Score vs Pass@1')
+    # Perform linear regression on the data
+    from sklearn.linear_model import LinearRegression
+    from sklearn.metrics import mean_squared_error, mean_absolute_error
+    from sklearn.preprocessing import StandardScaler
+
+    # Reshape data for sklearn
+    X = np.array(mean_scores).reshape(-1, 1)
+    y = np.array(pass_at_1)
+
+    if y.size == 0:
+        print("No valid mean scores available for regression.")
+        return None
+
+    # Normalize the target data
+    scaler_y = StandardScaler()
+    y_normalized = scaler_y.fit_transform(y.reshape(-1, 1)).flatten()
+
+    # Create and fit the model
+    model = LinearRegression()
+    model.fit(X, y_normalized)
+
+    # Predict using the model
+    y_pred = model.predict(X)
+
+    # Plot the linear regression line
+    plt.plot(scaler_y.inverse_transform(y_pred.reshape(-1, 1)), mean_scores, color='red', linestyle='-', label='Linear Regression')
+
+    # Calculate and print the mean squared error (L2 loss) and mean absolute error (L1 loss)
+    l2_loss = mean_squared_error(y_normalized, y_pred)
+    l1_loss = mean_absolute_error(y_normalized, y_pred)
+    print(f"Linear Regression L2 Loss: {l2_loss}, L1 Loss: {l1_loss}")
+
+    # Update the plot title to include the losses
+    plt.title(f'Pass@1 vs Mean Score. L2 loss: {l2_loss:.4f}, L1 loss: {l1_loss:.4f}')
     plt.xlabel('Pass@1')
     plt.ylabel('Mean Score')
     plt.grid(True)
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig(output_dir / 'pass_at_1_vs_mean_score.png')
+    plt.close()
+
+def plot_agg_scores_mean_vs_pass_at_1(results: List[Dict[str, Any]], output_dir: Path, strategy: str = "last"):
+    agg_scores_mean = []
+    agg_scores_std = []
+    for problem in results:
+        scores = problem["scores"]
+        agg_score = [aggregate_scores(s, strategy) for s in scores]
+        agg_score_mean = float(np.mean(agg_score))
+        agg_score_std = float(np.std(agg_score))
+        agg_scores_mean.append(agg_score_mean)
+        agg_scores_std.append(agg_score_std)
+
+
+    agg_scores_prod_mean = [r[f'agg_scores_{strategy}_mean'] for r in results if r[f'agg_scores_{strategy}_mean'] is not None]
+    pass_at_1 = [r['pass@1'] for r in results if r['pass@1'] is not None]
+    
+    if not agg_scores_prod_mean or not pass_at_1:
+        print("No data available for plotting.")
+        return None
+
+    plt.figure(figsize=(12, 6))
+    plt.scatter(pass_at_1, agg_scores_prod_mean, alpha=0.7, color='blue')
+    
+    # Perform linear regression on the data
+    from sklearn.linear_model import LinearRegression
+    from sklearn.metrics import mean_squared_error, mean_absolute_error
+    from sklearn.preprocessing import StandardScaler
+
+    # Reshape data for sklearn
+    X = np.array(agg_scores_prod_mean).reshape(-1, 1)
+    y = np.array(pass_at_1)
+
+    if y.size == 0:
+        print(f"No valid agg_scores_{strategy}_mean available for regression.")
+        return None
+
+    # Normalize the target data
+    scaler_y = StandardScaler()
+    y_normalized = scaler_y.fit_transform(y.reshape(-1, 1)).flatten()
+
+    # Create and fit the model
+    model = LinearRegression()
+    model.fit(X, y_normalized)
+
+    # Predict using the model
+    y_pred = model.predict(X)
+
+    # Plot the linear regression line
+    plt.plot(scaler_y.inverse_transform(y_pred.reshape(-1, 1)), agg_scores_prod_mean, color='red', linestyle='-', label='Linear Regression')
+
+    # Calculate and print the mean squared error (L2 loss) and mean absolute error (L1 loss)
+    l2_loss = mean_squared_error(y_normalized, y_pred)
+    l1_loss = mean_absolute_error(y_normalized, y_pred)
+    print(f"Linear Regression L2 Loss: {l2_loss}, L1 Loss: {l1_loss}")
+
+    # Update the plot title to include the losses
+    plt.title(f'Pass@1 vs Agg Scores {strategy} Mean. L2 loss: {l2_loss:.4f}, L1 loss: {l1_loss:.4f}')
+    plt.xlabel('Pass@1')
+    plt.ylabel(f'Agg Scores {strategy} Mean')
+    plt.grid(True)
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig(output_dir / f'pass_at_1_vs_agg_scores_{strategy}_mean.png')
+    plt.close()
+
+def plot_per_token_logprobs_for_ith_problem(results: List[Dict[str, Any]], output_dir: Path, problem_idx : int = 5):
+    if len(results) < problem_idx + 1:
+        print(f"Not enough problems to plot the {problem_idx + 1}th one.")
+        return
+    
+    per_token_probs_dir = output_dir / "per_token_probs"
+    per_token_probs_dir.mkdir(parents=True, exist_ok=True)
+
+    # Extract log probabilities for the i'th problem
+    problem = results[problem_idx]  # 0-based index
+    pass_at_1 = problem["pass@1"]
+    log_probs = problem['original_logprobs']
+    
+    plt.figure(figsize=(12, 6))
+    
+    # Plot each generation's log probabilities
+    for gen_index, gen_log_probs in enumerate(log_probs):
+        avg_log_probs_per_token = [token_probs[0] for token_probs in gen_log_probs]
+        plt.plot(avg_log_probs_per_token, label=f'Generation {gen_index + 1}')
+    
+    plt.title(f"Per Token Logprobs for {problem_idx}'th Problem (pass@1: {pass_at_1})")
+    plt.xlabel('Token Index')
+    plt.ylabel('Average Log Probability')
+    plt.grid(True)
+    plt.legend()
     
     plt.tight_layout()
-    plt.savefig(output_dir / 'mean_score_vs_pass_at_1.png')
+    plt.savefig(per_token_probs_dir / f'per_token_logprobs_{problem_idx}th_problem_{pass_at_1:.3f}.png')
+    plt.close()
+
+def plot_lowest_cutoff_logprobs_vs_pass_at_1(results: List[Dict[str, Any]], output_dir: Path, cutoff_value: float = -6.0):
+    # Calculate the average of logprobs below the cutoff value
+    log_probs = [r['original_logprobs'] for r in results]
+    avg_logprobs = []
+    count_below_cutoff = []  # New list to store counts of values below cutoff
+    for problem in range(len(log_probs)):
+        rank_probs = []
+        for gen in range(len(log_probs[problem])):
+            for token in range(len(log_probs[problem][gen])):
+                rank_probs.append(log_probs[problem][gen][token][0])
+        
+        # Filter values below the cutoff
+        below_cutoff = [prob for prob in rank_probs if prob < cutoff_value]
+        count_below_cutoff.append(len(below_cutoff))
+        
+        if below_cutoff:
+            avg = float(np.mean(below_cutoff))
+        else:
+            avg = float(0.)  # Handle case where no values are below cutoff
+        
+        avg_logprobs.append(avg)
+
+    pass_at_1 = [r['pass@1'] for r in results if r['pass@1'] is not None]
+    
+    plt.figure(figsize=(12, 6))
+    ax1 = plt.gca()  # Get the current axis
+    ax2 = ax1.twinx()  # Create a twin axis sharing the x-axis
+
+    ax1.scatter(pass_at_1, avg_logprobs, alpha=0.7, color='blue', label='Avg Logprob')
+    ax2.scatter(pass_at_1, count_below_cutoff, alpha=0.7, color='grey', label='Count Below Cutoff')  # Plot counts
+
+    # Perform linear regression on the data
+    from sklearn.linear_model import LinearRegression
+    from sklearn.metrics import mean_squared_error, mean_absolute_error
+    from sklearn.preprocessing import StandardScaler
+
+    # Reshape data for sklearn
+    X = np.array(pass_at_1).reshape(-1, 1)  # Corrected: X should be pass_at_1
+    y = np.array(avg_logprobs)
+
+    if y.size == 0:
+        print("No valid logprobs available for regression.")
+        return None
+
+    # Normalize the target data
+    scaler_y = StandardScaler()
+    y_normalized = scaler_y.fit_transform(y.reshape(-1, 1)).flatten()
+
+    # Create and fit the model
+    model = LinearRegression()
+    model.fit(X, y_normalized)
+
+    # Predict using the model
+    y_pred = model.predict(X)
+
+    # Plot the linear regression line
+    ax1.plot(pass_at_1, scaler_y.inverse_transform(y_pred.reshape(-1, 1)), color='black', linestyle='-', label='Linear Regression')
+
+    # Calculate and print the mean squared error (L2 loss) and mean absolute error (L1 loss)
+    l2_loss = mean_squared_error(y_normalized, y_pred)
+    l1_loss = mean_absolute_error(y_normalized, y_pred)
+    print(f"Linear Regression L2 Loss: {l2_loss}, L1 Loss: {l1_loss}")
+
+    # Calculate mean of pass_at_1 and count_below_cutoff for each unique avg_logprob
+    unique_avg_logprobs = np.unique(avg_logprobs)
+    mean_pass_per_logprob = [np.mean([pass_at_1[i] for i in range(len(avg_logprobs)) if avg_logprobs[i] == logprob_value]) for logprob_value in unique_avg_logprobs]
+    mean_count_per_logprob = [np.mean([count_below_cutoff[i] for i in range(len(avg_logprobs)) if avg_logprobs[i] == logprob_value]) for logprob_value in unique_avg_logprobs]  # Mean count
+
+    # Apply simple moving average
+    window_size = 5  # You can adjust the window size for smoothing
+    if len(mean_pass_per_logprob) >= window_size:
+        smooth_y_avg = moving_average(mean_pass_per_logprob, window_size)
+        smooth_y_count = moving_average(mean_count_per_logprob, window_size)  # Smooth count
+        smooth_x = unique_avg_logprobs[(window_size - 1):]  # Adjust x to match the length of smooth_y
+        ax1.plot(smooth_x, smooth_y_avg, color='red', linestyle='--', label='SMA of Pass@1 per Logprob')
+        ax2.plot(smooth_x, smooth_y_count, color='green', linestyle='--', label='SMA of Count Below Cutoff per Logprob')  # Plot smoothed count
+
+    ax1.set_title(f'Pass@1 vs Logprobs Below Cutoff. L2 loss: {l2_loss:.4f}, L1 loss: {l1_loss:.4f}')
+    ax1.set_xlabel('Pass@1')
+    ax1.set_ylabel(f'Logprob per Token (Below {cutoff_value})')
+    ax2.set_ylabel('Count Below Cutoff')
+    ax1.grid(True)
+
+    # Combine legends from both axes
+    lines, labels = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines + lines2, labels + labels2, loc='upper left')
+
+    plt.tight_layout()
+    plt.savefig(output_dir / f'pass_at_1_vs_below_cutoff_{cutoff_value}.png')
     plt.close()
 
 
 def create_plots(results: List[Dict[str, Any]], output_dir: Path):
     """Create all plots and save them to the output directory."""
-    # plot_per_problem_logprobs(results, output_dir, False)
-    # plot_per_problem_entropy(results, output_dir)
-    # plot_per_problem_level(results, output_dir)
-    # plot_pass_at_1(results, output_dir)
-    # plot_mean_score(results, output_dir)
-    # plot_level_mean(results, output_dir)
-    # plot_level_pass(results, output_dir)
-    # plot_entropy_vs_level_mean(results, output_dir)
-    # plot_entropy_vs_level_pass(results, output_dir)
-    # plot_logprobs_vs_level_mean(results, output_dir)
-    # plot_logprobs_vs_level_pass(results, output_dir)
-    # plot_entropy_vs_mean_score(results, output_dir)
-    # plot_entropy_vs_pass_at_1(results, output_dir)
-    # plot_logprobs_vs_mean_score(results, output_dir)
-    # plot_logprobs_vs_pass_at_1(results, output_dir)
-    plot_mean_score_vs_pass_at_1(results, output_dir)
+    # List of plotting functions with their names
+    plot_functions = [
+        # ("plot_entropy_vs_mean_score", plot_entropy_vs_mean_score),
+        # ("plot_entropy_vs_pass_at_1", plot_entropy_vs_pass_at_1),
+        # ("plot_logprobs_vs_mean_score", plot_logprobs_vs_mean_score),
+        # ("plot_logprobs_vs_pass_at_1", plot_logprobs_vs_pass_at_1),
+        # ("plot_varentropy_vs_pass_at_1", plot_varentropy_vs_pass_at_1),
+        # ("plot_mean_score_vs_pass_at_1", plot_mean_score_vs_pass_at_1),
+        # ("plot_per_token_logprobs_for_ith_problem", plot_per_token_logprobs_for_ith_problem),
+        # ("plot_lowest_quartile_logprobs_vs_pass_at_1", plot_lowest_quartile_logprobs_vs_pass_at_1),
+        # ("plot_lowest_quartile_entropy_vs_pass_at_1", plot_lowest_quartile_entropy_vs_pass_at_1),
+        # ("plot_difficulty_scalar", plot_difficulty_scalar),
+    ]
+
+    # Iterate over the functions and call them with tqdm
+    # for name, func in tqdm(plot_functions, desc="Generating plots"):
+        # # print(f"Calling {name}...")
+        # func(results, output_dir)
+    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.2")
+    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.2)
+    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.1")
+    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.1)
+    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.05")
+    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.05)
+    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.01")
+    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.01)
+    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.005")
+    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.005)
+    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.001")
+    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.001)
+    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.0005")
+    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.0005)
+    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.0")
+    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.0)
+    print("Plotting lowest quartile logprobs vs pass@1 with threshold 1.0")
+    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 1.0)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.2")
+    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.2)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.1")
+    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.1)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.05")
+    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.05)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.01")
+    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.01)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.005")
+    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.005)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.001")
+    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.001)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.0")
+    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 1.)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.2")
+    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.2)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.1")
+    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.1)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.05")
+    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.05)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.01")
+    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.01)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.005")
+    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.005)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.001")
+    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.001)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.0")
+    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 1.)
+    print("Plotting entropy vs sequence length")
+    plot_lowest_quartile_entropy_vs_seq_len(results, output_dir, 1.)
+
+    print("Plotting surprise vs sequence length")
+    plot_lowest_quartile_surprise_vs_seq_len(results, output_dir, 1.)
+    print("Plotting entropy vs sequence length")
+    plot_lowest_quartile_entropy_vs_seq_len(results, output_dir, 0.)
+
+    print("Plotting surprise vs sequence length")
+    plot_lowest_quartile_surprise_vs_seq_len(results, output_dir, 0.)
+
+    # plot_agg_scores_mean_vs_pass_at_1(results, output_dir, "last")
+    # plot_agg_scores_mean_vs_pass_at_1(results, output_dir, "min")
+    # plot_agg_scores_mean_vs_pass_at_1(results, output_dir, "prod")
+
+    # for i in tqdm(range(100), desc="Plotting per token logprobs"):
+        # plot_per_token_logprobs_for_ith_problem(results, output_dir, i)
+
+    # plot_lowest_cutoff_logprobs_vs_pass_at_1(results, output_dir, -4)
+    # plot_lowest_cutoff_logprobs_vs_pass_at_1(results, output_dir, -5)
+    # plot_lowest_cutoff_logprobs_vs_pass_at_1(results, output_dir, -6)
+    # plot_lowest_cutoff_logprobs_vs_pass_at_1(results, output_dir, -7)
+    # plot_lowest_cutoff_logprobs_vs_pass_at_1(results, output_dir, -8)
+    # plot_lowest_cutoff_logprobs_vs_pass_at_1(results, output_dir, -9)
 
 def analyze_logprobs(file_path: str, num_tokens_to_analyse: int) -> List[Dict[str, Any]]:
     results = []
@@ -367,14 +1101,23 @@ def analyze_logprobs(file_path: str, num_tokens_to_analyse: int) -> List[Dict[st
     with open(file_path, 'r') as f:
         for line in tqdm(f, desc="Processing lines"):
             data = json.loads(line)
-            
             # Skip if no log_probs
             if 'log_probs' not in data:
                 continue
-            if len(data['log_probs'][0]) < num_tokens_to_analyse:
-                raise ValueError(f"log_probs list ({len(data['log_probs'])}) is shorter than num_tokens_to_analyse ({num_tokens_to_analyse})")
-            log_probs = data['log_probs'][:][:num_tokens_to_analyse]
-            
+
+            scores = data["scores"]
+            agg_scores_last = [aggregate_scores(s, "last") for s in scores]
+            agg_scores_min = [aggregate_scores(s, "min") for s in scores]
+            agg_scores_prod = [aggregate_scores(s, "prod") for s in scores]
+
+            log_probs = data['log_probs']
+            if num_tokens_to_analyse:
+                if len(data['log_probs'][0]) < num_tokens_to_analyse:
+                    raise ValueError(f"log_probs list ({len(data['log_probs'])}) is shorter than num_tokens_to_analyse ({num_tokens_to_analyse})")
+                for idx, generation in enumerate(log_probs):
+                    log_probs[idx] = generation[:num_tokens_to_analyse]
+
+
             # Get dimensions
             num_generations = len(log_probs)
             
@@ -395,29 +1138,41 @@ def analyze_logprobs(file_path: str, num_tokens_to_analyse: int) -> List[Dict[st
                 
             
             # Calculate entropy for each token in each generation
-            entropies = []
+            entropies = [[] for _ in range(num_generations)]
+            surprises = [[] for _ in range(num_generations)]
             for gen in range(num_generations):
                 for token_logprobs in log_probs[gen]:
                     # Convert log probs to probabilities
                     probs = np.exp(token_logprobs)
                     # Calculate entropy
                     entropy = float(-np.sum(probs * token_logprobs))
-                    entropies.append(entropy)
-            
+                    surprise = float(-(1. - probs[0]) * token_logprobs[0])
+                    entropies[gen].append(entropy)
+                    surprises[gen].append(surprise)
             analysis = {
-                'unique_id': data['unique_id'],
-                'level': data['level'],
+                'unique_id': data.get('unique_id', None),
+                'problem': data.get('problem', None),
+                'level': data.get('level', None),
+                'seq_len': data.get('list_length', None),
                 'original_logprobs': log_probs,
                 'max_logprobs_per_token': [max(token_probs) for gen in log_probs for token_probs in gen],
                 'avg_by_rank': avg_by_rank,
                 'stds_by_rank': stds_by_rank,
                 'avg_logprob_per_token': float(np.mean([np.mean(probs) for gen in log_probs for probs in gen])),
                 'entropies': entropies,
-                'avg_entropy': float(np.mean(entropies)),
+                'surprises': surprises,
+                'avg_entropy': float(np.mean([item for sublist in entropies for item in sublist])),
                 'pass@1': data.get('pass@1', None),
                 'mean_score': data.get('mean_score', None),
                 'level_mean': data.get('level_mean', None),
-                'level_pass': data.get('level_pass', None)
+                'level_pass': data.get('level_pass', None),
+                'scores': data.get('scores', None),
+                'agg_scores_min_mean': float(np.mean(agg_scores_min)),
+                'agg_scores_min_std': float(np.std(agg_scores_min)),
+                'agg_scores_prod_mean': float(np.mean(agg_scores_prod)),
+                'agg_scores_prod_std': float(np.std(agg_scores_prod)),
+                'agg_scores_last_mean': float(np.mean(agg_scores_last)),
+                'agg_scores_last_std': float(np.std(agg_scores_last))
             }
             
             results.append(analysis)
@@ -433,38 +1188,87 @@ if __name__ == "__main__":
 
     file_path = sys.argv[1]
 
-    num_tokens_to_analyse = 15  # Default value
+    num_tokens_to_analyse = None  # Default value
 
-    if len(sys.argv) == 3:
+    if len(sys.argv) >= 3:
         try:
             num_tokens_to_analyse = int(sys.argv[2])
+            print(f"using {num_tokens_to_analyse} tokens to analyze")
         except ValueError:
-            print("Invalid number of tokens specified. Using default value of 15.")
+            raise ValueError(f"Invalid number of tokens specified: {sys.argv[2]}")
+
+    n_samples_to_analyse = None  # Default value
+
+    if len(sys.argv) >= 4:
+        try:
+            n_samples_to_analyse = int(sys.argv[3])
+            print(f"using {n_samples_to_analyse} samples to analyze")
+        except ValueError:
+            raise ValueError(f"Invalid number of samples specified: {sys.argv[3]}")
 
     if file_path.endswith('.jsonl'):
         results = analyze_logprobs(file_path, num_tokens_to_analyse)
+        # Create output directory based on input file name
+        output_dir = Path(file_path).parent / (Path(file_path).stem + '_analysis')
+        # Save results to JSON file
+        output_dir.mkdir(exist_ok=True)
+        # output_json = output_dir / 'analysis.json'
+        # with open(output_json, 'w') as f:
+            # json.dump(results, f, indent=2)
+        # print(f"Results saved to: {output_json}")
+        # Save results to msgpack file
+        output_msgpack = output_dir / 'analysis.msgpack'
+        with open(output_msgpack, 'wb') as f:
+            packed = msgpack.packb(results)
+            f.write(packed)
+        print(f"Results saved to: {output_msgpack}")
     else:
-        with open(file_path, 'r') as f:
-            results = json.load(f)
+        print(f"Loading {file_path}, this might take a while...")
+        file_size_in_bytes = Path(file_path).stat().st_size
+        if file_size_in_bytes >= 1e9:
+            file_size = file_size_in_bytes / 1e9
+            size_unit = "GB"
+        else:
+            file_size = file_size_in_bytes / 1e3
+            size_unit = "KB"
+        print(f"The size of the file is: {file_size:.2f} {size_unit}")
+        output_dir = Path(file_path).parent
+        if file_path.endswith('.json'):
+            with open(file_path, 'r') as f:
+                results = json.load(f)
+            # Save results to msgpack file
+            output_msgpack = output_dir / 'analysis.msgpack'
+            with open(output_msgpack, 'wb') as f:
+                packed = msgpack.packb(results)
+                f.write(packed)
+            print(f"Results saved to: {output_msgpack}")
+        elif file_path.endswith('.msgpack'):
+            with open(file_path, 'rb') as f:
+                results = msgpack.unpackb(f.read())
+        
+        if n_samples_to_analyse or num_tokens_to_analyse:
+            for i in tqdm(range(len(results))):
+                n_samples_to_analyse = min(n_samples_to_analyse, len(results[i]["original_logprobs"]))
+                results[i]["original_logprobs"] = results[i]["original_logprobs"][:n_samples_to_analyse]
+                results[i]["surprises"] = results[i]["surprises"][:n_samples_to_analyse]
+                results[i]["entropies"] = results[i]["entropies"][:n_samples_to_analyse]
+                for idx in range(len(results[i]["original_logprobs"])):
+                    num_tokens_to_analyse = min(num_tokens_to_analyse, len( results[i]["original_logprobs"][idx]))
+                    results[i]["original_logprobs"][idx] = results[i]["original_logprobs"][idx][:num_tokens_to_analyse]
+                    results[i]["surprises"][idx] = results[i]["surprises"][idx][:num_tokens_to_analyse]
+                    results[i]["entropies"][idx] = results[i]["entropies"][idx][:num_tokens_to_analyse]
+
+        # Create and save plots
+        create_plots(results, output_dir)
+        print(f"Plots saved in: {output_dir}")
     
-    # Create output directory based on input file name
-    output_dir = Path(file_path).parent / (Path(file_path).stem + '_analysis')
-    output_dir.mkdir(exist_ok=True)
-    
-    # Save results to JSON file
-    output_json = output_dir / 'analysis.json'
-    with open(output_json, 'w') as f:
-        json.dump(results, f, indent=2)
-    # Create and save plots
-    create_plots(results, output_dir)
     
     # Print summary of first result as example
     if results:
-        print(f"\nResults saved to: {output_json}")
-        print("\nPlots saved in: {output_dir}")
-        print("\nAnalysis of first entry:")
+        print("Analysis of first entry:")
         for key, value in results[0].items():
-            if key in ['original_logprobs', 'max_logprobs_per_token', 'entropies']:
+            if key in ['original_logprobs', 'max_logprobs_per_token', 
+                       'entropies', 'surprises', 'scores']:
                 print(f"{key}: [...]")  # Skip printing
             else:
                 print(f"{key}: {value}")

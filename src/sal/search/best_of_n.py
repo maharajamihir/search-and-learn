@@ -47,7 +47,6 @@ def best_of_n(x, config: Config, llm: LLM, prm: PRM):
     completions = [[] for _ in range(len(x["problem"]))]
     completion_tokens = [[] for _ in range(len(x["problem"]))]
     log_probs = [[] for _ in range(len(x["problem"]))]
-
     # TODO @mihir check the hyperparameters
     sampling_params = SamplingParams(
         temperature=config.temperature,
@@ -56,12 +55,13 @@ def best_of_n(x, config: Config, llm: LLM, prm: PRM):
         logprobs=config.log_probs,
         n=1,  # Since we've already duplicated the prompt_token_ids, we only need to generate 1 completion per prompt
     )
-
+    # Generate using vLLM
     responses = llm.generate(
         templated_convs,
         sampling_params=sampling_params,
         use_tqdm=False,
     )
+
     if len(responses) != len(x["problem"]) * config.n:
         raise ValueError(
             f"Generated {len(responses)} responses instead of {len(x['problem'] * config.n)}"
@@ -91,7 +91,6 @@ def best_of_n(x, config: Config, llm: LLM, prm: PRM):
     for c in completions:
         if len(c) != config.n:
             raise ValueError(f"Generated {len(c)} completions instead of {config.n}")
-
     scores = prm.score(x["problem"], completions)
     agg_scores = [
         [aggregate_scores(s, config.agg_strategy) for s in score] for score in scores

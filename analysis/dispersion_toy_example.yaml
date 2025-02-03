@@ -1,0 +1,16 @@
+# refer to src/sal/config.py for more options
+
+approach: estimate_difficulty
+n: 4 # n: 4
+search_batch_size: 1
+sort_completed: true
+filter_duplicates: true
+num_samples: 100         # REMOVE THIS LINE TO RUN ON THE WHOLE DATASET
+# num_samples: 10         # REMOVE THIS LINE TO RUN ON THE WHOLE DATASET
+seed: 0
+max_tokens: 50
+dataset_name: mihirma/max-retrieval-dataset
+dataset_split: easy
+# Chat template related options
+# system_prompt: "Find the maximum number of the following integer sequence:\n\n- For simple sequences (2 steps or fewer):\nProvide a concise solution with minimal explanation.\n\n- For complex sequences (3 steps or more):\nUse this step-by-step format:\n\n## Step 1: [Concise description]\n[Brief explanation and reasoning]\n\n## Step 2: [Concise description]\n[Brief explanation and reasoning]\n\n...\n\nRegardless of the approach, always conclude with:\n\nTherefore, the final answer is: $\\boxed{answer}$. I hope it is correct.\n\nWhere [answer] is just the largest integer in the provided sequence.\n"
+system_prompt: "Find the maximum number of the following integer sequence without thinking! You are to immediately spit out your solution!:\n\nFollow directly with your answer. It is severely important that you do NOT think out loud about problem! DO NOT THINK STEP BY STEP! PROVIDE THE YOUR ANSWER SENTENCE IMMEDIATELY!\n\nRegardless of the problem, always conclude with:\n\nTherefore, the final answer is: $\\boxed{answer}$. I hope it is correct.\n\nWhere [answer] is just the largest integer in the provided sequence. Only whatever is written inside $\\boxed{answer}$ will be evaluated, so it is essential, that you write your answer in 'boxed'!"

@@ -57,10 +57,17 @@ def memoized_canonical_form(expression: str, timeout_seconds: int = 3) -> str:
     # Check if the result is already cached
     answer = re.search(r'\\boxed\{(.+?)\}', expression)
     if not answer:
-        fallback = strip_string(expression)
-        shared_cache[expression] = fallback  # Cache the fallback result
-        return fallback
-    expression = answer.group(1)
+        # Try to extract the answer from a sentence
+        if "Therefore" in expression:
+            sentence_answer = re.findall(r"\$(.*?)\$", expression)
+            if sentence_answer:
+                expression = sentence_answer[-1]
+        else:
+            fallback = strip_string(expression)
+            shared_cache[expression] = fallback  # Cache the fallback result
+            return fallback
+    else:
+        expression = answer.group(1)
     
     if expression in shared_cache:
         return shared_cache[expression]
@@ -265,6 +272,8 @@ def compute_pass_at_k(x, k):
         # print(pred)
     #================================
     # Compute the canonical form of the correct answer
+    if type(x["answer"]) == int:
+        x["answer"] = str(x["answer"])
     canonical_answer = memoized_canonical_form(x["answer"])
     #================================
     #TODO @mihir remove

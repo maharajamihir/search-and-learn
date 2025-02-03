@@ -20,7 +20,7 @@ from vllm import LLM
 
 from sal.config import Config
 from sal.models.reward_models import load_prm
-from sal.search import beam_search, best_of_n, dvts
+from sal.search import beam_search, best_of_n, dvts, estimate_difficulty
 from sal.utils.data import get_dataset, save_dataset
 from sal.utils.parser import H4ArgumentParser
 from sal.utils.score import score
@@ -35,6 +35,7 @@ APPROACHES = {
     "beam_search": beam_search,
     "dvts": dvts,
     "best_of_n": best_of_n,
+    "estimate_difficulty": estimate_difficulty,
 }
 
 
@@ -45,14 +46,19 @@ def main():
     approach_fn = APPROACHES[config.approach]
 
     num_gpus = torch.cuda.device_count()
-    llm = LLM(
-        model=config.model_path,
-        gpu_memory_utilization=config.gpu_memory_utilization,
-        enable_prefix_caching=True,
-        seed=config.seed,
-        tensor_parallel_size=num_gpus,
-    )
-    prm = load_prm(config)
+
+    if config.approach != "estimate_difficulty":
+        llm = LLM(
+            model=config.model_path,
+            gpu_memory_utilization=config.gpu_memory_utilization,
+            enable_prefix_caching=True,
+            seed=config.seed,
+            tensor_parallel_size=num_gpus,
+        )
+        prm = load_prm(config)
+    else: 
+        llm = None
+        prm = None
 
     dataset = get_dataset(config)
     dataset = dataset.map(
@@ -63,8 +69,8 @@ def main():
         desc="Running search",
         load_from_cache_file=False,
     )
-
-    dataset = score(dataset, config)
+    if config.approach != "estimate_difficulty":
+        dataset = score(dataset, config)
 
     save_dataset(dataset, config)
     logger.info("Done 🔥!")

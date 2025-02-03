@@ -58,7 +58,7 @@ class Config:
     seed: int = 42
     max_tokens: int = 2048
     agg_strategy: str = "last"  # Options: "last", "min", "prod"
-    log_probs = 5
+    log_probs = 20
 
     # DVTS / Beam Search options
     beam_width: int = 4  # m in the paper
