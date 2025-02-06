@@ -62,6 +62,7 @@ def memoized_canonical_form(expression: str, timeout_seconds: int = 3) -> str:
             sentence_answer = re.findall(r"\$(.*?)\$", expression)
             if sentence_answer:
                 expression = sentence_answer[-1]
+            
         else:
             fallback = strip_string(expression)
             shared_cache[expression] = fallback  # Cache the fallback result

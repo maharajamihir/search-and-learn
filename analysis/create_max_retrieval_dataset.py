@@ -34,13 +34,21 @@ data_dict = {
 # Create a Hugging Face Dataset
 dataset = Dataset.from_dict(data_dict)
 
-# Create a split for problems with list length < 2**4
+# Create a split for problems with list length < 2**5
 easy_dataset = dataset.filter(lambda example: example['list_length'] < 2**5)
 
-# Use the entire dataset without splitting and add the easy split
+# Create a split for problems with list length from 2**3 up to 2**7
+medium_dataset = dataset.filter(lambda example: 2**3 <= example['list_length'] < 2**7)
+
+# Create a split for problems with list length from 2**3 up to 2**7
+hard_dataset = dataset.filter(lambda example: 2**5 <= example['list_length'] < 2**8)
+
+# Use the entire dataset without splitting and add the easy and medium splits
 dataset_dict = DatasetDict({
     'full': dataset,
-    'easy': easy_dataset
+    'easy': easy_dataset,
+    'medium': medium_dataset,
+    'hard': hard_dataset,
 })
 
 # Push the dataset to the Hugging Face Hub

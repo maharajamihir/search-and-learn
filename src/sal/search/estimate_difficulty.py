@@ -53,6 +53,7 @@ def estimate_difficulty(x, config: Config, llm: LLM, prm: PRM):
     model_name = "meta-llama/Llama-3.2-1B-Instruct"
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForCausalLM.from_pretrained(model_name, return_dict_in_generate=True, output_attentions=True, attn_implementation="eager")
+    tokenizer.pad_token = tokenizer.eos_token
     # TODO: set the augmented template from a file
     if config.custom_chat_template is not None:
         tokenizer.chat_template = config.custom_chat_template
@@ -67,46 +68,50 @@ def estimate_difficulty(x, config: Config, llm: LLM, prm: PRM):
     # Initialize empty lists for completions and completion tokens
     log_probs = [[] for _ in range(len(x["problem"]))]
     attentions = [[] for _ in range(len(x["problem"]))]
-    # TODO @mihir check the hyperparameters
-    sampling_params = SamplingParams(
-        temperature=config.temperature,
-        max_tokens=config.max_tokens,
-        top_p=config.top_p,
-        logprobs=config.log_probs,
-        n=1,  # Since we've already duplicated the prompt_token_ids, we only need to generate 1 completion per prompt
-    )
+    completions = [[] for _ in range(len(x["problem"]))]
     # Generate using Hugging Face
-
     attn_list = []
     log_probs_list = []
-    for conv in tqdm(templated_convs):
-        attentions_list_conv = []
-        log_probs_list_conv = []
-        # Generate text with attention outputs
-        inputs = tokenizer(conv, return_tensors="pt")
-        inputs = inputs.to(model.device)  # Move inputs to the same device as the model
+    completions_list = []
+    batch_size = 8  # Define the batch size
+    # Process in batches
+    for batch_start in tqdm(range(0, len(templated_convs), batch_size)):
+        batch_convs = templated_convs[batch_start:batch_start + batch_size]
+        attentions_list_batch = [[] for _ in range(len(batch_convs))]
+        log_probs_list_batch = [[] for _ in range(len(batch_convs))]
+        completions_list_batch = [[] for _ in range(len(batch_convs))]
+
+
+        # Tokenize and move to device
+        inputs = tokenizer(batch_convs, return_tensors="pt", padding=True).to(model.device)
         with torch.no_grad():
-            for _ in range(config.max_tokens):
+            for _ in tqdm(range(config.max_tokens)):
                 outputs = model(**inputs, attn_implementation="eager")
                 # Sample next token using temperature
                 next_token_logits = outputs.logits[:, -1, :] / config.temperature
                 next_token_probs = torch.nn.functional.softmax(next_token_logits, dim=-1)
                 next_token = torch.multinomial(next_token_probs, num_samples=1)
-                next_token_probs = next_token_probs[:, :config.log_probs] # cutoff logprobs for memory efficiency
-                log_probs_list_conv.append(next_token_probs.cpu()) 
-            
-                # gather the attentions coefficients over the selected token per head
-                next_token_attentions = outputs.attentions
-                selected_token_attentions = [
-                    attention[:, :, -1, :].cpu() for attention in next_token_attentions
-                ]
-                attentions_list_conv.append(selected_token_attentions)
+                next_token_probs = next_token_probs[:, :config.log_probs]  # cutoff logprobs for memory efficiency
 
-                inputs['input_ids'] = torch.cat([inputs['input_ids'], next_token], dim=-1)
-                inputs['attention_mask'] = torch.ones(inputs["input_ids"].shape, dtype=torch.int)
-        attn_list.append(attentions_list_conv)
-        log_probs_list.append(log_probs_list_conv)
-    
+                for i in range(len(batch_convs)):
+                    log_probs_list_batch[i].append(next_token_probs[i].cpu())
+                    completions_list_batch[i].append(next_token[i].cpu())  # Add next token to completions
+
+                # gather the attentions coefficients over the last non-padded token per head
+                for i, attention in enumerate(outputs.attentions[0]):
+                    selected_token_attentions = attention[:, -1, :]
+                    attentions_list_batch[i].append(selected_token_attentions.cpu())
+                # Update inputs for the next iteration
+                inputs['input_ids'] = torch.cat([inputs['input_ids'], next_token], dim=1)
+                inputs['attention_mask'] = torch.cat([inputs['attention_mask'], torch.ones((len(batch_convs), 1), dtype=torch.int).to(model.device)], dim=1)
+
+        attn_list.extend(attentions_list_batch)
+        log_probs_list.extend(log_probs_list_batch)
+        completions_list.extend(completions_list_batch)  # Extend completions list
+
+    completions_list = torch.tensor(completions_list)
+    completions_list = [tokenizer.decode(compl) for compl in completions_list]
+    # Correctly assign log_probs, attentions, and completions to each problem
     for i in range(len(x["problem"])):
         log_probs[i] = [
             log_prob
@@ -116,7 +121,12 @@ def estimate_difficulty(x, config: Config, llm: LLM, prm: PRM):
             attn 
             for attn in attn_list[i * config.n : (i + 1) * config.n]
         ]
+        completions[i] = [
+            completion
+            for completion in completions_list[i * config.n : (i + 1) * config.n]
+        ]
 
+    x["completions"] = completions
     x["log_probs"] = log_probs
     x["attentions"] = attentions
     return x
