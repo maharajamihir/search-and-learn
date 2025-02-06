@@ -10,295 +10,6 @@ import torch.nn.functional as F
 
 from sal.utils.score import aggregate_scores
 
-####### THESE ARE OUR ENTRYPOINTS INTO ANALYSIS AND PLOTTING ###########################################################
-
-def create_plots(results: List[Dict[str, Any]], output_dir: Path):
-    """Create all plots and save them to the output directory."""
-    # List of plotting functions with their names
-    plot_functions = [
-        ("plot_entropy_vs_mean_score", plot_entropy_vs_mean_score),
-        ("plot_entropy_vs_pass_at_1", plot_entropy_vs_pass_at_1),
-        ("plot_logprobs_vs_mean_score", plot_logprobs_vs_mean_score),
-        ("plot_logprobs_vs_pass_at_1", plot_logprobs_vs_pass_at_1),
-        ("plot_varentropy_vs_pass_at_1", plot_varentropy_vs_pass_at_1),
-        ("plot_mean_score_vs_pass_at_1", plot_mean_score_vs_pass_at_1),
-        ("plot_per_token_logprobs_for_ith_problem", plot_per_token_logprobs_for_ith_problem),
-        ("plot_lowest_quartile_logprobs_vs_pass_at_1", plot_lowest_quartile_logprobs_vs_pass_at_1),
-        ("plot_lowest_quartile_entropy_vs_pass_at_1", plot_lowest_quartile_entropy_vs_pass_at_1),
-        ("plot_difficulty_scalar", plot_difficulty_scalar),
-        ("plot_varentropy_vs_mean_entropy", plot_varentropy_vs_mean_entropy),
-        # ("plot_per_head_per_layer_entropies_scatter", plot_per_head_per_layer_entropies_scatter),
-        ("plot_pass_at_1_vs_list_len_score", plot_pass_at_1_vs_list_len_score),
-        # ("plot_per_head_per_layer_entropies_vs_pass_at_1", plot_per_head_per_layer_entropies_scatter_pass_at_1),
-        # ("plot_per_head_per_layer_min_entropies_scatter", plot_per_head_per_layer_min_entropies_scatter),
-        # ("plot_per_head_per_layer_min_entropies_scatter_pass_at_1", plot_per_head_per_layer_min_entropies_scatter_pass_at_1),
-    ]
-
-    # Iterate over the functions and call them with tqdm
-    for name, func in tqdm(plot_functions, desc="Generating plots"):
-        # print(f"Calling {name}...")
-        func(results, output_dir)
-    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.2")
-    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.2)
-    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.1")
-    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.1)
-    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.05")
-    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.05)
-    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.01")
-    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.01)
-    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.005")
-    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.005)
-    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.001")
-    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.001)
-    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.0005")
-    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.0005)
-    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.0")
-    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.0)
-    print("Plotting lowest quartile logprobs vs pass@1 with threshold 1.0")
-    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 1.0)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.2")
-    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.2)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.1")
-    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.1)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.05")
-    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.05)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.01")
-    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.01)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.005")
-    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.005)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.001")
-    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.001)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.0")
-    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 1.)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.2")
-    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.2)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.1")
-    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.1)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.05")
-    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.05)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.01")
-    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.01)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.005")
-    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.005)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.001")
-    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.001)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.0")
-    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 1.)
-
-    print("Plotting entropy vs sequence length")
-    plot_lowest_quartile_entropy_vs_seq_len(results, output_dir, 1.)
-    print("Plotting surprise vs sequence length")
-    plot_lowest_quartile_surprise_vs_seq_len(results, output_dir, 1.)
-    print("Plotting entropy vs sequence length")
-    plot_lowest_quartile_entropy_vs_seq_len(results, output_dir, 0.)
-    print("Plotting surprise vs sequence length")
-    plot_lowest_quartile_surprise_vs_seq_len(results, output_dir, 0.)
-
-    print("Plotting entropy vs sequence length")
-    plot_lowest_quartile_entropy_vs_seq_len(results, output_dir, 0.5)
-    print("Plotting surprise vs sequence length")
-    plot_lowest_quartile_surprise_vs_seq_len(results, output_dir, 0.5)
-    print("Plotting entropy vs sequence length")
-    plot_lowest_quartile_entropy_vs_seq_len(results, output_dir, 0.33)
-    print("Plotting surprise vs sequence length")
-    plot_lowest_quartile_surprise_vs_seq_len(results, output_dir, 0.33)
-
-    plot_agg_scores_mean_vs_pass_at_1(results, output_dir, "last")
-    plot_agg_scores_mean_vs_pass_at_1(results, output_dir, "min")
-    plot_agg_scores_mean_vs_pass_at_1(results, output_dir, "prod")
-
-    # for i in tqdm(range(100), desc="Plotting per token logprobs"):
-        # plot_per_token_logprobs_for_ith_problem(results, output_dir, i)
-
-    # plot_lowest_cutoff_logprobs_vs_pass_at_1(results, output_dir, -4)
-    # plot_lowest_cutoff_logprobs_vs_pass_at_1(results, output_dir, -5)
-    # plot_lowest_cutoff_logprobs_vs_pass_at_1(results, output_dir, -6)
-    # plot_lowest_cutoff_logprobs_vs_pass_at_1(results, output_dir, -7)
-    # plot_lowest_cutoff_logprobs_vs_pass_at_1(results, output_dir, -8)
-    # plot_lowest_cutoff_logprobs_vs_pass_at_1(results, output_dir, -9)
-
-def analyze_logprobs(file_path: str, num_tokens_to_analyse: int) -> List[Dict[str, Any]]:
-    results = []
-    
-    with open(file_path, 'r') as f:
-        for line in tqdm(f, desc="Processing lines"):
-            data = json.loads(line)
-            # Skip if no log_probs
-            if 'log_probs' not in data:
-                continue
-
-            scores = data["scores"]
-            agg_scores_last = [aggregate_scores(s, "last") for s in scores]
-            agg_scores_min = [aggregate_scores(s, "min") for s in scores]
-            agg_scores_prod = [aggregate_scores(s, "prod") for s in scores]
-
-            log_probs = data['log_probs']
-            if num_tokens_to_analyse:
-                if len(data['log_probs'][0]) < num_tokens_to_analyse:
-                    raise ValueError(f"log_probs list ({len(data['log_probs'])}) is shorter than num_tokens_to_analyse ({num_tokens_to_analyse})")
-                for idx, generation in enumerate(log_probs):
-                    log_probs[idx] = generation[:num_tokens_to_analyse]
-
-
-            # Get dimensions
-            num_generations = len(log_probs)
-            
-            # Calculate average for each rank position across all generations and tokens
-            avg_by_rank = []
-            stds_by_rank = []
-
-            for rank in range(len(log_probs[0][0])):  # For each rank position
-                rank_probs = []
-                for gen in range(num_generations):
-                    for token in range(len(log_probs[gen])):
-                        if rank < len(log_probs[gen][token]):
-                            rank_probs.append(log_probs[gen][token][rank])
-                avg = float(np.mean(rank_probs))
-                std = float(np.std(rank_probs))
-                avg_by_rank.append(avg)
-                stds_by_rank.append(std)
-                
-            
-            # Calculate entropy for each token in each generation
-            entropies = [[] for _ in range(num_generations)]
-            surprises = [[] for _ in range(num_generations)]
-            for gen in range(num_generations):
-                for token_logprobs in log_probs[gen]:
-                    # Convert log probs to probabilities
-                    probs = np.exp(token_logprobs)
-                    # Calculate entropy
-                    entropy = float(-np.sum(probs * token_logprobs))
-                    surprise = float(-(1. - probs[0]) * token_logprobs[0])
-                    entropies[gen].append(entropy)
-                    surprises[gen].append(surprise)
-
-            pass_at_1 = data.get("pass@1", None)
-            if "list_length" in data.keys():
-                num_correct = sum([1 if str(data["answer"]) in compl else 0 for compl in data["completions"]])
-                pass_at_1 = num_correct/len(data["completions"])
-
-            analysis = {
-                'unique_id': data.get('unique_id', None),
-                'problem': data.get('problem', None),
-                'level': data.get('level', None),
-                'list_length': data.get('list_length', None),
-                'original_logprobs': log_probs,
-                'max_logprobs_per_token': [max(token_probs) for gen in log_probs for token_probs in gen],
-                'avg_by_rank': avg_by_rank,
-                'stds_by_rank': stds_by_rank,
-                'avg_logprob_per_token': float(np.mean([np.mean(probs) for gen in log_probs for probs in gen])),
-                'entropies': entropies,
-                'surprises': surprises,
-                'avg_entropy': float(np.mean([item for sublist in entropies for item in sublist])),
-                'pass@1': pass_at_1,
-                'mean_score': data.get('mean_score', None),
-                'level_mean': data.get('level_mean', None),
-                'level_pass': data.get('level_pass', None),
-                'scores': data.get('scores', None),
-                'agg_scores_min_mean': float(np.mean(agg_scores_min)),
-                'agg_scores_min_std': float(np.std(agg_scores_min)),
-                'agg_scores_prod_mean': float(np.mean(agg_scores_prod)),
-                'agg_scores_prod_std': float(np.std(agg_scores_prod)),
-                'agg_scores_last_mean': float(np.mean(agg_scores_last)),
-                'agg_scores_last_std': float(np.std(agg_scores_last))
-            }
-            
-            results.append(analysis)
-    
-    return results
-
-if __name__ == "__main__":
-    import sys
-    
-    if len(sys.argv) < 2:
-        print("Usage: python analyse_logprobs.py <path_to_jsonl>")
-        sys.exit(1)
-
-    file_path = sys.argv[1]
-
-    num_tokens_to_analyse = None  # Default value
-
-    if len(sys.argv) >= 3:
-        try:
-            num_tokens_to_analyse = int(sys.argv[2])
-            print(f"using {num_tokens_to_analyse} tokens to analyze")
-        except ValueError:
-            raise ValueError(f"Invalid number of tokens specified: {sys.argv[2]}")
-
-    n_samples_to_analyse = None  # Default value
-
-    if len(sys.argv) >= 4:
-        try:
-            n_samples_to_analyse = int(sys.argv[3])
-            print(f"using {n_samples_to_analyse} samples to analyze")
-        except ValueError:
-            raise ValueError(f"Invalid number of samples specified: {sys.argv[3]}")
-
-    if file_path.endswith('.jsonl'):
-        if Path(file_path).stem.startswith('best_of_n'):
-            results = analyze_logprobs(file_path, num_tokens_to_analyse)
-        else:
-            results = analyse_attentional_coeff(file_path, num_tokens_to_analyse)
-        # Create output directory based on input file name
-        output_dir = Path(file_path).parent / (Path(file_path).stem + '_analysis')
-        # Save results to JSON file
-        output_dir.mkdir(exist_ok=True)
-        output_msgpack = output_dir / 'analysis.msgpack'
-        with open(output_msgpack, 'wb') as f:
-            packed = msgpack.packb(results)
-            f.write(packed)
-        print(f"Results saved to: {output_msgpack}")
-    else:
-        print(f"Loading {file_path}, this might take a while...")
-        file_size_in_bytes = Path(file_path).stat().st_size
-        if file_size_in_bytes >= 1e9:
-            file_size = file_size_in_bytes / 1e9
-            size_unit = "GB"
-        else:
-            file_size = file_size_in_bytes / 1e3
-            size_unit = "KB"
-        print(f"The size of the file is: {file_size:.2f} {size_unit}")
-        output_dir = Path(file_path).parent
-        if file_path.endswith('.json'):
-            with open(file_path, 'r') as f:
-                results = json.load(f)
-            # Save results to msgpack file
-            output_msgpack = output_dir / 'analysis.msgpack'
-            with open(output_msgpack, 'wb') as f:
-                packed = msgpack.packb(results)
-                f.write(packed)
-            print(f"Results saved to: {output_msgpack}")
-        elif file_path.endswith('.msgpack'):
-            with open(file_path, 'rb') as f:
-                results = msgpack.unpackb(f.read())
-        
-        if n_samples_to_analyse or num_tokens_to_analyse:
-            for i in tqdm(range(len(results))):
-                n_samples_to_analyse = min(n_samples_to_analyse, len(results[i]["original_logprobs"]))
-                results[i]["original_logprobs"] = results[i]["original_logprobs"][:n_samples_to_analyse]
-                results[i]["surprises"] = results[i]["surprises"][:n_samples_to_analyse]
-                results[i]["entropies"] = results[i]["entropies"][:n_samples_to_analyse]
-                for idx in range(len(results[i]["original_logprobs"])):
-                    #num_tokens_to_analyse = min(num_tokens_to_analyse, len(results[i]["original_logprobs"][idx]))
-                    results[i]["original_logprobs"][idx] = results[i]["original_logprobs"][idx][:num_tokens_to_analyse]
-                    results[i]["surprises"][idx] = results[i]["surprises"][idx][:num_tokens_to_analyse]
-                    results[i]["entropies"][idx] = results[i]["entropies"][idx][:num_tokens_to_analyse]
-
-        # Create and save plots
-        create_plots(results, output_dir)
-        print(f"Plots saved in: {output_dir}")
-    
-    
-    # Print summary of first result as example
-    if results:
-        print("Analysis of first entry:")
-        for key, value in results[0].items():
-            if key in ['original_logprobs', 'max_logprobs_per_token', 
-                       'entropies', 'surprises', 'scores', 'attention_entropies']:
-                print(f"{key}: [...]")  # Skip printing
-            else:
-                print(f"{key}: {value}")
-
 ##########################################################################################################################
 
 
@@ -338,6 +49,32 @@ def plot_entropy_vs_pass_at_1(results: List[Dict[str, Any]], output_dir: Path):
     plt.tight_layout()
     plt.savefig(output_dir / 'pass_at_1_vs_entropy.png')
     plt.close()
+
+
+def plot_stddentropy_vs_pass_at_1(results: List[Dict[str, Any]], output_dir: Path):
+    # Calculate standard deviation and mean of entropy for each result    
+    stddentropies = [np.std([item for sublist in r['entropies'] for item in sublist]) for r in results]
+    mean_entropies = [np.mean([item for sublist in r['entropies'] for item in sublist]) for r in results]
+    pass_at_1 = [r['pass@1'] for r in results if r['pass@1'] is not None]
+    
+    # Normalize mean entropies for color mapping
+    norm = plt.Normalize(min(mean_entropies), max(mean_entropies))
+    cmap = plt.cm.get_cmap('coolwarm')  # Blue (low) to Red (high)
+    
+    plt.figure(figsize=(12, 6))
+    scatter = plt.scatter(pass_at_1, stddentropies, alpha=0.7, c=mean_entropies, cmap=cmap, norm=norm)
+    
+    plt.title('Pass@1 vs Stddentropy (color indicates mean entropy)')
+    plt.xlabel('Pass@1')
+    plt.ylabel('Stddentropy')
+    plt.colorbar(scatter, label='Mean Entropy')
+    plt.grid(True)
+    
+    plt.tight_layout()
+    plt.savefig(output_dir / 'pass_at_1_vs_stddentropy.png')
+    plt.close()
+
+
 
 def plot_varentropy_vs_pass_at_1(results: List[Dict[str, Any]], output_dir: Path):
     # Calculate variance of entropy for each result    
@@ -1506,4 +1243,296 @@ def analyse_attentional_coeff(file_path: str, num_tokens_to_analyse: int) -> Lis
 
 
 
+
+####### THESE ARE OUR ENTRYPOINTS INTO ANALYSIS AND PLOTTING ###########################################################
+
+def create_plots(results: List[Dict[str, Any]], output_dir: Path):
+    """Create all plots and save them to the output directory."""
+    # List of plotting functions with their names
+    plot_functions = [
+        # ("plot_entropy_vs_mean_score", plot_entropy_vs_mean_score),
+        # ("plot_entropy_vs_pass_at_1", plot_entropy_vs_pass_at_1),
+        # ("plot_logprobs_vs_mean_score", plot_logprobs_vs_mean_score),
+        # ("plot_logprobs_vs_pass_at_1", plot_logprobs_vs_pass_at_1),
+        # ("plot_varentropy_vs_pass_at_1", plot_varentropy_vs_pass_at_1),
+        # ("plot_mean_score_vs_pass_at_1", plot_mean_score_vs_pass_at_1),
+        # ("plot_per_token_logprobs_for_ith_problem", plot_per_token_logprobs_for_ith_problem),
+        # ("plot_lowest_quartile_logprobs_vs_pass_at_1", plot_lowest_quartile_logprobs_vs_pass_at_1),
+        # ("plot_lowest_quartile_entropy_vs_pass_at_1", plot_lowest_quartile_entropy_vs_pass_at_1),
+        # ("plot_difficulty_scalar", plot_difficulty_scalar),
+        # ("plot_varentropy_vs_mean_entropy", plot_varentropy_vs_mean_entropy),
+        # ("plot_per_head_per_layer_entropies_scatter", plot_per_head_per_layer_entropies_scatter),
+        # ("plot_pass_at_1_vs_list_len_score", plot_pass_at_1_vs_list_len_score),
+        # ("plot_per_head_per_layer_entropies_vs_pass_at_1", plot_per_head_per_layer_entropies_scatter_pass_at_1),
+        # ("plot_per_head_per_layer_min_entropies_scatter", plot_per_head_per_layer_min_entropies_scatter),
+        # ("plot_per_head_per_layer_min_entropies_scatter_pass_at_1", plot_per_head_per_layer_min_entropies_scatter_pass_at_1),
+        ("plot_stddentropy_vs_pass_at_1", plot_stddentropy_vs_pass_at_1),
+
+    ]
+
+
+    # Iterate over the functions and call them with tqdm
+    for name, func in tqdm(plot_functions, desc="Generating plots"):
+        # print(f"Calling {name}...")
+        func(results, output_dir)
+    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.2")
+    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.2)
+    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.1")
+    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.1)
+    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.05")
+    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.05)
+    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.01")
+    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.01)
+    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.005")
+    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.005)
+    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.001")
+    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.001)
+    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.0005")
+    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.0005)
+    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.0")
+    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.0)
+    print("Plotting lowest quartile logprobs vs pass@1 with threshold 1.0")
+    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 1.0)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.2")
+    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.2)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.1")
+    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.1)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.05")
+    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.05)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.01")
+    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.01)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.005")
+    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.005)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.001")
+    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.001)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.0")
+    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 1.)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.2")
+    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.2)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.1")
+    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.1)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.05")
+    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.05)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.01")
+    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.01)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.005")
+    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.005)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.001")
+    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.001)
+    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.0")
+    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 1.)
+
+    print("Plotting entropy vs sequence length")
+    plot_lowest_quartile_entropy_vs_seq_len(results, output_dir, 1.)
+    print("Plotting surprise vs sequence length")
+    plot_lowest_quartile_surprise_vs_seq_len(results, output_dir, 1.)
+    print("Plotting entropy vs sequence length")
+    plot_lowest_quartile_entropy_vs_seq_len(results, output_dir, 0.)
+    print("Plotting surprise vs sequence length")
+    plot_lowest_quartile_surprise_vs_seq_len(results, output_dir, 0.)
+
+    print("Plotting entropy vs sequence length")
+    plot_lowest_quartile_entropy_vs_seq_len(results, output_dir, 0.5)
+    print("Plotting surprise vs sequence length")
+    plot_lowest_quartile_surprise_vs_seq_len(results, output_dir, 0.5)
+    print("Plotting entropy vs sequence length")
+    plot_lowest_quartile_entropy_vs_seq_len(results, output_dir, 0.33)
+    print("Plotting surprise vs sequence length")
+    plot_lowest_quartile_surprise_vs_seq_len(results, output_dir, 0.33)
+
+    plot_agg_scores_mean_vs_pass_at_1(results, output_dir, "last")
+    plot_agg_scores_mean_vs_pass_at_1(results, output_dir, "min")
+    plot_agg_scores_mean_vs_pass_at_1(results, output_dir, "prod")
+
+    # for i in tqdm(range(100), desc="Plotting per token logprobs"):
+        # plot_per_token_logprobs_for_ith_problem(results, output_dir, i)
+
+    # plot_lowest_cutoff_logprobs_vs_pass_at_1(results, output_dir, -4)
+    # plot_lowest_cutoff_logprobs_vs_pass_at_1(results, output_dir, -5)
+    # plot_lowest_cutoff_logprobs_vs_pass_at_1(results, output_dir, -6)
+    # plot_lowest_cutoff_logprobs_vs_pass_at_1(results, output_dir, -7)
+    # plot_lowest_cutoff_logprobs_vs_pass_at_1(results, output_dir, -8)
+    # plot_lowest_cutoff_logprobs_vs_pass_at_1(results, output_dir, -9)
+
+def analyze_logprobs(file_path: str, num_tokens_to_analyse: int) -> List[Dict[str, Any]]:
+    results = []
+    
+    with open(file_path, 'r') as f:
+        for line in tqdm(f, desc="Processing lines"):
+            data = json.loads(line)
+            # Skip if no log_probs
+            if 'log_probs' not in data:
+                continue
+
+            scores = data["scores"]
+            agg_scores_last = [aggregate_scores(s, "last") for s in scores]
+            agg_scores_min = [aggregate_scores(s, "min") for s in scores]
+            agg_scores_prod = [aggregate_scores(s, "prod") for s in scores]
+
+            log_probs = data['log_probs']
+            if num_tokens_to_analyse:
+                if len(data['log_probs'][0]) < num_tokens_to_analyse:
+                    raise ValueError(f"log_probs list ({len(data['log_probs'])}) is shorter than num_tokens_to_analyse ({num_tokens_to_analyse})")
+                for idx, generation in enumerate(log_probs):
+                    log_probs[idx] = generation[:num_tokens_to_analyse]
+
+
+            # Get dimensions
+            num_generations = len(log_probs)
+            
+            # Calculate average for each rank position across all generations and tokens
+            avg_by_rank = []
+            stds_by_rank = []
+
+            for rank in range(len(log_probs[0][0])):  # For each rank position
+                rank_probs = []
+                for gen in range(num_generations):
+                    for token in range(len(log_probs[gen])):
+                        if rank < len(log_probs[gen][token]):
+                            rank_probs.append(log_probs[gen][token][rank])
+                avg = float(np.mean(rank_probs))
+                std = float(np.std(rank_probs))
+                avg_by_rank.append(avg)
+                stds_by_rank.append(std)
+                
+            
+            # Calculate entropy for each token in each generation
+            entropies = [[] for _ in range(num_generations)]
+            surprises = [[] for _ in range(num_generations)]
+            for gen in range(num_generations):
+                for token_logprobs in log_probs[gen]:
+                    # Convert log probs to probabilities
+                    probs = np.exp(token_logprobs)
+                    # Calculate entropy
+                    entropy = float(-np.sum(probs * token_logprobs))
+                    surprise = float(-(1. - probs[0]) * token_logprobs[0])
+                    entropies[gen].append(entropy)
+                    surprises[gen].append(surprise)
+
+            pass_at_1 = data.get("pass@1", None)
+            if "list_length" in data.keys():
+                num_correct = sum([1 if str(data["answer"]) in compl else 0 for compl in data["completions"]])
+                pass_at_1 = num_correct/len(data["completions"])
+
+            analysis = {
+                'unique_id': data.get('unique_id', None),
+                'problem': data.get('problem', None),
+                'level': data.get('level', None),
+                'list_length': data.get('seq_len', None),
+                'original_logprobs': log_probs,
+                'max_logprobs_per_token': [max(token_probs) for gen in log_probs for token_probs in gen],
+                'avg_by_rank': avg_by_rank,
+                'stds_by_rank': stds_by_rank,
+                'avg_logprob_per_token': float(np.mean([np.mean(probs) for gen in log_probs for probs in gen])),
+                'entropies': entropies,
+                'surprises': surprises,
+                'avg_entropy': float(np.mean([item for sublist in entropies for item in sublist])),
+                'pass@1': pass_at_1,
+                'mean_score': data.get('mean_score', None),
+                'level_mean': data.get('level_mean', None),
+                'level_pass': data.get('level_pass', None),
+                'scores': data.get('scores', None),
+                'agg_scores_min_mean': float(np.mean(agg_scores_min)),
+                'agg_scores_min_std': float(np.std(agg_scores_min)),
+                'agg_scores_prod_mean': float(np.mean(agg_scores_prod)),
+                'agg_scores_prod_std': float(np.std(agg_scores_prod)),
+                'agg_scores_last_mean': float(np.mean(agg_scores_last)),
+                'agg_scores_last_std': float(np.std(agg_scores_last))
+            }
+            
+            results.append(analysis)
+    
+    return results
+
+if __name__ == "__main__":
+    import sys
+    
+    if len(sys.argv) < 2:
+        print("Usage: python analyse_logprobs.py <path_to_jsonl>")
+        sys.exit(1)
+
+    file_path = sys.argv[1]
+
+    num_tokens_to_analyse = None  # Default value
+
+    if len(sys.argv) >= 3:
+        try:
+            num_tokens_to_analyse = int(sys.argv[2])
+            print(f"using {num_tokens_to_analyse} tokens to analyze")
+        except ValueError:
+            raise ValueError(f"Invalid number of tokens specified: {sys.argv[2]}")
+
+    n_samples_to_analyse = None  # Default value
+
+    if len(sys.argv) >= 4:
+        try:
+            n_samples_to_analyse = int(sys.argv[3])
+            print(f"using {n_samples_to_analyse} samples to analyze")
+        except ValueError:
+            raise ValueError(f"Invalid number of samples specified: {sys.argv[3]}")
+
+    if file_path.endswith('.jsonl'):
+        if Path(file_path).stem.startswith('best_of_n'):
+            results = analyze_logprobs(file_path, num_tokens_to_analyse)
+        else:
+            results = analyse_attentional_coeff(file_path, num_tokens_to_analyse)
+        # Create output directory based on input file name
+        output_dir = Path(file_path).parent / (Path(file_path).stem + '_analysis')
+        # Save results to JSON file
+        output_dir.mkdir(exist_ok=True)
+        output_msgpack = output_dir / 'analysis.msgpack'
+        with open(output_msgpack, 'wb') as f:
+            packed = msgpack.packb(results)
+            f.write(packed)
+        print(f"Results saved to: {output_msgpack}")
+    else:
+        print(f"Loading {file_path}, this might take a while...")
+        file_size_in_bytes = Path(file_path).stat().st_size
+        if file_size_in_bytes >= 1e9:
+            file_size = file_size_in_bytes / 1e9
+            size_unit = "GB"
+        else:
+            file_size = file_size_in_bytes / 1e3
+            size_unit = "KB"
+        print(f"The size of the file is: {file_size:.2f} {size_unit}")
+        output_dir = Path(file_path).parent
+        if file_path.endswith('.json'):
+            with open(file_path, 'r') as f:
+                results = json.load(f)
+            # Save results to msgpack file
+            output_msgpack = output_dir / 'analysis.msgpack'
+            with open(output_msgpack, 'wb') as f:
+                packed = msgpack.packb(results)
+                f.write(packed)
+            print(f"Results saved to: {output_msgpack}")
+        elif file_path.endswith('.msgpack'):
+            with open(file_path, 'rb') as f:
+                results = msgpack.unpackb(f.read())
+        
+        if n_samples_to_analyse or num_tokens_to_analyse:
+            for i in tqdm(range(len(results))):
+                n_samples_to_analyse = min(n_samples_to_analyse, len(results[i]["original_logprobs"]))
+                results[i]["original_logprobs"] = results[i]["original_logprobs"][:n_samples_to_analyse]
+                results[i]["surprises"] = results[i]["surprises"][:n_samples_to_analyse]
+                results[i]["entropies"] = results[i]["entropies"][:n_samples_to_analyse]
+                for idx in range(len(results[i]["original_logprobs"])):
+                    #num_tokens_to_analyse = min(num_tokens_to_analyse, len(results[i]["original_logprobs"][idx]))
+                    results[i]["original_logprobs"][idx] = results[i]["original_logprobs"][idx][:num_tokens_to_analyse]
+                    results[i]["surprises"][idx] = results[i]["surprises"][idx][:num_tokens_to_analyse]
+                    results[i]["entropies"][idx] = results[i]["entropies"][idx][:num_tokens_to_analyse]
+
+        # Create and save plots
+        create_plots(results, output_dir)
+        print(f"Plots saved in: {output_dir}")
+    
+    
+    # Print summary of first result as example
+    if results:
+        print("Analysis of first entry:")
+        for key, value in results[0].items():
+            if key in ['original_logprobs', 'max_logprobs_per_token', 
+                       'entropies', 'surprises', 'scores', 'attention_entropies']:
+                print(f"{key}: [...]")  # Skip printing
+            else:
+                print(f"{key}: {value}")
 
