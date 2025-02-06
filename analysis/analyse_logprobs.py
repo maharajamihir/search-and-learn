@@ -13,7 +13,6 @@ from sal.utils.score import aggregate_scores
 ##########################################################################################################################
 
 
-
 ######### THESE ARE THE MOST RELEVANT PLOTTING FUNCTIONS FOR OUR CURRENT EVALS ###########################################
 
 def moving_average(data, window_size):
@@ -1413,7 +1412,6 @@ def analyze_logprobs(file_path: str, num_tokens_to_analyse: int) -> List[Dict[st
             if "list_length" in data.keys():
                 num_correct = sum([1 if str(data["answer"]) in compl else 0 for compl in data["completions"]])
                 pass_at_1 = num_correct/len(data["completions"])
-
             analysis = {
                 'unique_id': data.get('unique_id', None),
                 'problem': data.get('problem', None),
@@ -1426,6 +1424,7 @@ def analyze_logprobs(file_path: str, num_tokens_to_analyse: int) -> List[Dict[st
                 'avg_logprob_per_token': float(np.mean([np.mean(probs) for gen in log_probs for probs in gen])),
                 'entropies': entropies,
                 'surprises': surprises,
+                'difficulty': np.std([item for sublist in entropies for item in sublist]),
                 'avg_entropy': float(np.mean([item for sublist in entropies for item in sublist])),
                 'pass@1': pass_at_1,
                 'mean_score': data.get('mean_score', None),
