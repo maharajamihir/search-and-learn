@@ -20,7 +20,7 @@ from vllm import LLM
 
 from sal.config import Config
 from sal.models.reward_models import load_prm
-from sal.search import beam_search, best_of_n, dvts, estimate_difficulty
+from sal.search import beam_search, best_of_n, dvts, estimate_difficulty, adaptive_best_of_n, load_adaptive_best_of_n_dataset
 from sal.utils.data import get_dataset, save_dataset
 from sal.utils.parser import H4ArgumentParser
 from sal.utils.score import score
@@ -36,18 +36,22 @@ APPROACHES = {
     "dvts": dvts,
     "best_of_n": best_of_n,
     "estimate_difficulty": estimate_difficulty,
+    "adaptive_best_of_n": adaptive_best_of_n
 }
 
 
 def main():
     parser = H4ArgumentParser(Config)
-    config = parser.parse()
+    config = parser.parse(True)
 
     approach_fn = APPROACHES[config.approach]
 
     num_gpus = torch.cuda.device_count()
 
-    dataset = get_dataset(config)
+    if config.approach == "adaptive_best_of_n":
+        dataset = load_adaptive_best_of_n_dataset(config.dataset_name, config.n)
+    else:
+        dataset = get_dataset(config)
 
     if config.approach != "estimate_difficulty":
         llm = LLM(

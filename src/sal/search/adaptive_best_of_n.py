@@ -19,9 +19,20 @@ from vllm import LLM, SamplingParams
 from sal.config import Config
 from sal.models.reward_models import PRM
 from sal.utils.score import aggregate_scores
+from datasets import Dataset
+import msgpack
+
+def load_adaptive_best_of_n_dataset(path, max_num_generations):
+    with open(path, 'rb') as f:
+        data = msgpack.unpack(f, raw=False)
+    for idx, element in enumerate(data):
+        difficulty = element.get('difficulty', 0.5)  # Default to 1 if difficulty is not present
+        data[idx]['n'] = int(difficulty * max_num_generations + 0.5)
+    dataset = Dataset.from_list(data)
+    return dataset
 
 
-def best_of_n(x, config: Config, llm: LLM, prm: PRM):
+def adaptive_best_of_n(x, config: Config, llm: LLM, prm: PRM):
     tokenizer = llm.get_tokenizer()
 
     convs = [
@@ -39,9 +50,21 @@ def best_of_n(x, config: Config, llm: LLM, prm: PRM):
         convs, tokenize=False, add_generation_prompt=True
     )
 
-    # Duplicate convs to generate config.n completions per prompt so we can do continous batching
-    # This makes [p1, p2, p3, p4] become [p1, p1, p2, p2, p3, p3, p4, p4] for e.g. config.n=2
-    templated_convs = [c for conv in templated_convs for c in [conv] * config.n]
+    n_generations = x["n"]
+    if type(n_generations) == list and type(n_generations[0]) == int:
+        n_generations = n_generations[0]
+    
+    if n_generations == 0:
+        x["completions"] = []
+        x["scores"] = []
+        x["pred"] = []
+        x["completion_tokens"] = []
+        x["log_probs"] = []
+        return x
+
+    # Duplicate convs to generate n_generations completions per prompt so we can do continous batching
+    # This makes [p1, p2, p3, p4] become [p1, p1, p2, p2, p3, p3, p4, p4] for e.g. n_generations=2
+    templated_convs = [c for conv in templated_convs for c in [conv] * n_generations]
 
     # Initialize empty lists for completions and completion tokens
     completions = [[] for _ in range(len(x["problem"]))]
@@ -62,23 +85,23 @@ def best_of_n(x, config: Config, llm: LLM, prm: PRM):
         use_tqdm=False,
     )
 
-    if len(responses) != len(x["problem"]) * config.n:
+    if len(responses) != len(x["problem"]) * n_generations:
         raise ValueError(
-            f"Generated {len(responses)} responses instead of {len(x['problem'] * config.n)}"
+            f"Generated {len(responses)} responses instead of {len(x['problem'] * n_generations)}"
         )
 
     for i in range(len(completions)):
         completions[i] = [
             output.text
-            for r in responses[i * config.n : (i + 1) * config.n]
+            for r in responses[i * n_generations : (i + 1) * n_generations]
             for output in r.outputs
         ]
         completion_tokens[i] = [
             len(output.token_ids)
-            for r in responses[i * config.n : (i + 1) * config.n]
+            for r in responses[i * n_generations : (i + 1) * n_generations]
             for output in r.outputs
         ]
-        for r in responses[i * config.n : (i + 1) * config.n]:
+        for r in responses[i * n_generations : (i + 1) * n_generations]:
             for output in r.outputs:
                 log_probs_per_token = []
                 for token_distr in output.logprobs:
@@ -89,8 +112,8 @@ def best_of_n(x, config: Config, llm: LLM, prm: PRM):
 
     # Check we generated the correct number of completions for each prompt
     for c in completions:
-        if len(c) != config.n:
-            raise ValueError(f"Generated {len(c)} completions instead of {config.n}")
+        if len(c) != n_generations:
+            raise ValueError(f"Generated {len(c)} completions instead of {n_generations}")
     scores = prm.score(x["problem"], completions)
     agg_scores = [
         [aggregate_scores(s, config.agg_strategy) for s in score] for score in scores
