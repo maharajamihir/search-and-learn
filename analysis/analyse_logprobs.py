@@ -7,12 +7,12 @@ import msgpack
 from pathlib import Path
 import torch
 import torch.nn.functional as F
+from sklearn.linear_model import LinearRegression
 
 from sal.utils.score import aggregate_scores
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 ##########################################################################################################################
-
-
 
 ######### THESE ARE THE MOST RELEVANT PLOTTING FUNCTIONS FOR OUR CURRENT EVALS ###########################################
 
@@ -207,7 +207,7 @@ def plot_agg_scores_mean_vs_pass_at_1(results: List[Dict[str, Any]], output_dir:
     y_pred = model.predict(X)
 
     # Plot the linear regression line
-    plt.plot(scaler_y.inverse_transform(y_pred.reshape(-1, 1)), agg_scores_prod_mean, color='red', linestyle='-', label='Linear Regression')
+    # plt.plot(scaler_y.inverse_transform(y_pred.reshape(-1, 1)), agg_scores_prod_mean, color='red', linestyle='-', label='Linear Regression')
 
     # Calculate and print the mean squared error (L2 loss) and mean absolute error (L1 loss)
     l2_loss = mean_squared_error(y_normalized, y_pred)
@@ -1239,8 +1239,320 @@ def analyse_attentional_coeff(file_path: str, num_tokens_to_analyse: int) -> Lis
 
     return results
 
+
+
+
 ##########################################################################################################################
 
+#                 #     #  ###  ####  #### 
+#                 ##   ## #   # #   # #  
+#                 # # # # #   # ####  ### 
+#                 #  #  # #   # #  #  #  
+#                 #     #  ###  #   # #### 
+
+##########################################################################################################################
+
+def plot_agg_scores_mean_vs_pass_at_1_l1_l2_loss(results: List[Dict[str, Any]], output_dir: Path, strategy: str = "last"):
+    agg_scores_mean = []
+    agg_scores_std = []
+    for problem in results:
+        scores = problem["scores"]
+        agg_score = [aggregate_scores(s, strategy) for s in scores]
+        agg_score_mean = float(np.mean(agg_score))
+        agg_score_std = float(np.std(agg_score))
+        agg_scores_mean.append(agg_score_mean)
+        agg_scores_std.append(agg_score_std)
+
+    agg_scores_prod_mean = [r[f'agg_scores_{strategy}_mean'] for r in results if r[f'agg_scores_{strategy}_mean'] is not None]
+    pass_at_1 = [r['pass@1'] for r in results if r['pass@1'] is not None]
+    
+    if not agg_scores_prod_mean or not pass_at_1:
+        print("No data available for plotting.")
+        return None
+
+    plt.figure(figsize=(12, 6))
+    plt.scatter(pass_at_1, agg_scores_prod_mean, alpha=0.7, color='blue')
+    
+    # Add a new line from the bottom left corner to the top right
+    plt.plot([0, 1], [0, 1], 'g--', label='Diagonal Line')
+
+    # Calculate L1 and L2 loss
+    ground_truth_y = np.array(pass_at_1)  # Adjusted to match the diagonal line
+    l2_loss = mean_squared_error(ground_truth_y, agg_scores_prod_mean)
+    l1_loss = mean_absolute_error(ground_truth_y, agg_scores_prod_mean)
+    
+    # Update the plot title to include the losses
+    plt.title(f'Pass@1 vs Agg Scores {strategy} Mean. L2 loss: {l2_loss:.4f}, L1 loss: {l1_loss:.4f}')
+    plt.xlabel('Pass@1')
+    plt.ylabel(f'Agg Scores {strategy} Mean')
+    plt.grid(True)
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig(output_dir / f'pass_at_1_vs_agg_scores_{strategy}_mean.png')
+    plt.close()
+
+
+
+def plot_varentropy_vs_pass_at_1_regression_l1_l2_loss(results: List[Dict[str, Any]], output_dir: Path):
+    # Calculate variance of entropy for each result    
+    varentropies = [np.var([item for sublist in r['entropies'] for item in sublist]) for r in results]
+    mean_entropies = [np.mean([item for sublist in r['entropies'] for item in sublist]) for r in results]
+    pass_at_1 = [r['pass@1'] for r in results if r['pass@1'] is not None]
+    
+    # Normalize mean entropies for color mapping
+    norm = plt.Normalize(min(mean_entropies), max(mean_entropies))
+    cmap = plt.cm.get_cmap('coolwarm')  # Blue (low) to Red (high)
+    
+    plt.figure(figsize=(12, 6))
+    scatter = plt.scatter(pass_at_1, varentropies, alpha=0.7, c=mean_entropies, cmap=cmap, norm=norm)
+    
+    # Add ground truth line from (0,1) to (1,0)
+    plt.plot([0, 1], [1, 0], 'g--', label='Ground Truth Line')
+    
+    # Calculate L1 and L2 loss
+    ground_truth_y = 1 - np.array(pass_at_1)
+    l2_loss = mean_squared_error(ground_truth_y, varentropies)
+    l1_loss = mean_absolute_error(ground_truth_y, varentropies)
+    
+    # Update the plot title to include the losses
+    plt.title(f'Pass@1 vs Varentropy (color indicates mean entropy). L2 loss: {l2_loss:.4f}, L1 loss: {l1_loss:.4f}')
+    plt.xlabel('Pass@1')
+    plt.ylabel('Varentropy')
+    plt.colorbar(scatter, label='Mean Entropy')
+    plt.legend()
+    plt.grid(True)
+    
+    plt.tight_layout()
+    plt.savefig(output_dir / 'pass_at_1_vs_varentropy.png')
+    plt.close()
+
+    return l1_loss, l2_loss
+
+
+def plot_entropy_vs_pass_at_1_regression_l1_l2_loss(results: List[Dict[str, Any]], output_dir: Path):
+    entropies = [np.mean([item for sublist in r['entropies'] for item in sublist]) for r in results]
+    min_entropy = min(entropies)
+    max_entropy = max(entropies)
+    
+    # Normalize entropies for color mapping
+    normalized_entropies = [(e - min_entropy) / (max_entropy - min_entropy) for e in entropies]
+    pass_at_1 = [r['pass@1'] for r in results if r['pass@1'] is not None]
+    
+    # Normalize mean entropies for color mapping
+    norm = plt.Normalize(min(entropies), max(entropies))
+    cmap = plt.cm.get_cmap('coolwarm')  # Blue (low) to Red (high)
+    
+    plt.figure(figsize=(12, 6))
+    scatter = plt.scatter(pass_at_1, normalized_entropies, alpha=0.7, c=entropies, cmap=cmap, norm=norm)
+
+    # Add ground truth line from (0,1) to (1,0)
+    plt.plot([0, 1], [1, 0], 'g--', label='Ground Truth Line')
+    
+    # Calculate L1 and L2 loss
+    ground_truth_y = 1 - np.array(pass_at_1)
+    l2_loss = mean_squared_error(ground_truth_y, normalized_entropies)
+    l1_loss = mean_absolute_error(ground_truth_y, normalized_entropies)
+    
+    # Update the plot title to include the losses
+    plt.title(f'Pass@1 vs Entropy (color indicates mean entropy). L2 loss: {l2_loss:.4f}, L1 loss: {l1_loss:.4f}')
+    plt.xlabel('Pass@1')
+    plt.ylabel('Entropy')
+    plt.colorbar(scatter, label='Mean Entropy')
+    plt.legend()
+    plt.grid(True)
+    
+    plt.tight_layout()
+    plt.savefig(output_dir / 'pass_at_1_vs_entropy.png')
+    plt.close()
+
+    return l1_loss, l2_loss
+
+def plot_stddentropy_vs_pass_at_1_regression_l1_l2_loss(results: List[Dict[str, Any]], output_dir: Path):
+    # Calculate standard deviation and mean of entropy for each result    
+    stddentropies = [np.std([item for sublist in r['entropies'] for item in sublist]) for r in results]
+    mean_entropies = [np.mean([item for sublist in r['entropies'] for item in sublist]) for r in results]
+    pass_at_1 = [r['pass@1'] for r in results] 
+    
+    # Normalize mean entropies for color mapping
+    norm = plt.Normalize(min(mean_entropies), max(mean_entropies))
+    cmap = plt.cm.get_cmap('coolwarm')  # Blue (low) to Red (high)
+    
+    plt.figure(figsize=(12, 6))
+    scatter = plt.scatter(pass_at_1, stddentropies, alpha=0.7, c=mean_entropies, cmap=cmap, norm=norm)
+    
+    # Add ground truth line from (0,1) to (1,0)
+    plt.plot([0, 1], [1, 0], 'g--', label='Ground Truth Line')
+    
+    # Calculate L1 and L2 loss
+    ground_truth_y = 1 - np.array(pass_at_1)
+    l2_loss = mean_squared_error(ground_truth_y, stddentropies)
+    l1_loss = mean_absolute_error(ground_truth_y, stddentropies)
+    
+    # # Update the plot title to include the losses
+    plt.title(f'Pass@1 vs Stddentropy (color indicates mean entropy). L2 loss: {l2_loss:.4f}, L1 loss: {l1_loss:.4f}')
+    plt.xlabel('Pass@1')
+    plt.ylabel('Stddentropy')
+    plt.colorbar(scatter, label='Mean Entropy')
+    plt.legend()
+    plt.grid(True)
+    
+    plt.tight_layout()
+    plt.savefig(output_dir / 'pass_at_1_vs_stddentropy.png')
+    plt.close()
+
+    return l1_loss, l2_loss
+
+
+
+
+def get_loss_varentropy_vs_pass_at_1_regression_l1_l2_loss(results: List[Dict[str, Any]]):
+    # Calculate variance of entropy for each result    
+    varentropies = [np.var([item for sublist in r['entropies'] for item in sublist]) for r in results]
+    pass_at_1 = [r['pass@1'] for r in results if r['pass@1'] is not None]
+    
+    # Calculate L1 and L2 loss
+    ground_truth_y = 1 - np.array(pass_at_1)
+    l2_loss = mean_squared_error(ground_truth_y, varentropies)
+    l1_loss = mean_absolute_error(ground_truth_y, varentropies)
+
+    return {'l1_loss': l1_loss, 'l2_loss': l2_loss}
+
+
+def get_loss_entropy_vs_pass_at_1_regression_l1_l2_loss(results: List[Dict[str, Any]]):
+    entropies = [np.mean([item for sublist in r['entropies'] for item in sublist]) for r in results]
+    min_entropy = min(entropies)
+    max_entropy = max(entropies)
+    
+    # Normalize entropies for color mapping
+    normalized_entropies = [(e - min_entropy) / (max_entropy - min_entropy) for e in entropies]
+    pass_at_1 = [r['pass@1'] for r in results if r['pass@1'] is not None]
+   
+    # Calculate L1 and L2 loss
+    ground_truth_y = 1 - np.array(pass_at_1)
+    l2_loss = mean_squared_error(ground_truth_y, normalized_entropies)
+    l1_loss = mean_absolute_error(ground_truth_y, normalized_entropies)
+    
+    return {'l1_loss': l1_loss, 'l2_loss': l2_loss}
+
+
+def get_loss_stddentropy_vs_pass_at_1_regression_l1_l2_loss(results: List[Dict[str, Any]]):
+    # Calculate standard deviation and mean of entropy for each result    
+    stddentropies = [np.std([item for sublist in r['entropies'] for item in sublist]) for r in results]
+    pass_at_1 = [r['pass@1'] for r in results] 
+    # Calculate L1 and L2 loss
+    ground_truth_y = 1 - np.array(pass_at_1)
+    l2_loss = mean_squared_error(ground_truth_y, stddentropies)
+    l1_loss = mean_absolute_error(ground_truth_y, stddentropies)
+
+    return {'l1_loss': l1_loss, 'l2_loss': l2_loss}
+
+
+def plot_losses(entropy_losses, varentropy_losses, stddentropy_losses, output_dir: Path):
+    sample_sizes = sorted(entropy_losses.keys())
+
+    # Extract L1 and L2 losses for each sample size
+    entropy_l1 = [entropy_losses[sample]['l1_loss'] for sample in sample_sizes]
+    entropy_l2 = [entropy_losses[sample]['l2_loss'] for sample in sample_sizes]
+    
+    varentropy_l1 = [varentropy_losses[sample]['l1_loss'] for sample in sample_sizes]
+    varentropy_l2 = [varentropy_losses[sample]['l2_loss'] for sample in sample_sizes]
+    
+    stddentropy_l1 = [stddentropy_losses[sample]['l1_loss'] for sample in sample_sizes]
+    stddentropy_l2 = [stddentropy_losses[sample]['l2_loss'] for sample in sample_sizes]
+
+    # Ensure the output directory exists
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Plot and save for entropy losses
+    fig, ax1 = plt.subplots(figsize=(6, 4))
+    ax1.plot(sample_sizes, entropy_l1, 'g-', label='Entropy L1 Loss')
+    ax1.set_xscale('log', base=2)
+    ax1.set_xlabel('Number of Samples (log scale)')
+    ax1.set_ylabel('L1 Loss', color='g')
+    ax1.set_title('Entropy Losses')
+    ax1.grid(True)
+
+    ax2 = ax1.twinx()
+    ax2.plot(sample_sizes, entropy_l2, 'm-', label='Entropy L2 Loss')
+    ax2.set_ylabel('L2 Loss', color='m')
+
+    fig.tight_layout()
+    plt.savefig(output_dir / 'entropy_losses_plot.png')
+    plt.close()
+
+    # Plot and save for varentropy losses
+    fig, ax1 = plt.subplots(figsize=(6, 4))
+    ax1.plot(sample_sizes, varentropy_l1, 'g-', label='Varentropy L1 Loss')
+    ax1.set_xscale('log', base=2)
+    ax1.set_xlabel('Number of Samples (log scale)')
+    ax1.set_ylabel('L1 Loss', color='g')
+    ax1.set_title('Varentropy Losses')
+    ax1.grid(True)
+
+    ax2 = ax1.twinx()
+    ax2.plot(sample_sizes, varentropy_l2, 'm-', label='Varentropy L2 Loss')
+    ax2.set_ylabel('L2 Loss', color='m')
+
+    fig.tight_layout()
+    plt.savefig(output_dir / 'varentropy_losses_plot.png')
+    plt.close()
+
+    # Plot and save for stddentropy losses
+    fig, ax1 = plt.subplots(figsize=(6, 4))
+    ax1.plot(sample_sizes, stddentropy_l1, 'g-', label='Stddentropy L1 Loss')
+    ax1.set_xscale('log', base=2)
+    ax1.set_xlabel('Number of Samples (log scale)')
+    ax1.set_ylabel('L1 Loss', color='g')
+    ax1.set_title('Stddentropy Losses')
+    ax1.grid(True)
+
+    ax2 = ax1.twinx()
+    ax2.plot(sample_sizes, stddentropy_l2, 'm-', label='Stddentropy L2 Loss')
+    ax2.set_ylabel('L2 Loss', color='m')
+
+    fig.tight_layout()
+    plt.savefig(output_dir / 'stddentropy_losses_plot.png')
+    plt.close()
+
+# Example usage
+# plot_losses(entropy_losses, varentropy_losses, stddentropy_losses, Path('data/meta-llama/Llama-3.2-1B-Instruct/best_of_n_completions_analysis'))
+
+
+def loop_through_n_samples(results: List[Dict[str, Any]], num_tokens_to_analyse: int = 15, ) -> Dict[str, Dict[str, float]]:
+
+    entropy_losses = {} 
+    varentropy_losses = {} 
+    stddentropy_losses = {} 
+    
+    # sample_sizes = [2**n for n in range(8)]
+    sample_sizes = [16, 32]
+    for n_samples_to_analyse in sample_sizes:
+        print(n_samples_to_analyse)
+        for i in tqdm(range(len(results))):
+            n_samples_to_analyse = min(n_samples_to_analyse, len(results[i]["original_logprobs"]))
+            results[i]["original_logprobs"] = results[i]["original_logprobs"][:n_samples_to_analyse]
+            results[i]["surprises"] = results[i]["surprises"][:n_samples_to_analyse]
+            results[i]["entropies"] = results[i]["entropies"][:n_samples_to_analyse]
+            for idx in range(len(results[i]["original_logprobs"])):
+                results[i]["original_logprobs"][idx] = results[i]["original_logprobs"][idx][:num_tokens_to_analyse]
+                results[i]["surprises"][idx] = results[i]["surprises"][idx][:num_tokens_to_analyse]
+                results[i]["entropies"][idx] = results[i]["entropies"][idx][:num_tokens_to_analyse]
+        # create and save plots
+        stddentropy_losses[n_samples_to_analyse] = get_loss_stddentropy_vs_pass_at_1_regression_l1_l2_loss(results)
+        entropy_losses[n_samples_to_analyse] = get_loss_entropy_vs_pass_at_1_regression_l1_l2_loss(results)
+        varentropy_losses[n_samples_to_analyse] = get_loss_varentropy_vs_pass_at_1_regression_l1_l2_loss(results)
+
+    print(stddentropy_losses)
+    print(entropy_losses)
+    print(varentropy_losses)
+
+
+
+    plot_losses(entropy_losses, varentropy_losses, stddentropy_losses, Path('data/meta-llama/Llama-3.2-1B-Instruct/best_of_n_completions_analysis'))
+
+   
+    
 
 
 
@@ -1444,32 +1756,36 @@ def analyze_logprobs(file_path: str, num_tokens_to_analyse: int) -> List[Dict[st
     
     return results
 
+
+
+
+
 if __name__ == "__main__":
-    import sys
-    
-    if len(sys.argv) < 2:
-        print("Usage: python analyse_logprobs.py <path_to_jsonl>")
-        sys.exit(1)
+    import argparse
+    from pathlib import Path
+    import msgpack
+    import json
+    from tqdm import tqdm
 
-    file_path = sys.argv[1]
+    parser = argparse.ArgumentParser(description="Analyze log probabilities from a JSONL file.")
+    parser.add_argument("file_path", type=str, help="Path to the JSONL file.")
+    parser.add_argument("--num_tokens", type=int, default=None, help="Number of tokens to analyze.")
+    parser.add_argument("--n_samples", type=int, default=None, help="Number of samples to analyze.")
+    parser.add_argument("--loop_samples", action='store_true', help="Run loop through n_samples to calculate losses.")
 
-    num_tokens_to_analyse = None  # Default value
+    args = parser.parse_args()
 
-    if len(sys.argv) >= 3:
-        try:
-            num_tokens_to_analyse = int(sys.argv[2])
-            print(f"using {num_tokens_to_analyse} tokens to analyze")
-        except ValueError:
-            raise ValueError(f"Invalid number of tokens specified: {sys.argv[2]}")
+    file_path = args.file_path
+    num_tokens_to_analyse = args.num_tokens
+    n_samples_to_analyse = args.n_samples
 
-    n_samples_to_analyse = None  # Default value
+    print('Starting analysis...')
 
-    if len(sys.argv) >= 4:
-        try:
-            n_samples_to_analyse = int(sys.argv[3])
-            print(f"using {n_samples_to_analyse} samples to analyze")
-        except ValueError:
-            raise ValueError(f"Invalid number of samples specified: {sys.argv[3]}")
+    if num_tokens_to_analyse is not None:
+        print(f"Using {num_tokens_to_analyse} tokens to analyze")
+       
+    if n_samples_to_analyse is not None:
+        print(f"Using {n_samples_to_analyse} samples to analyze")
 
     if file_path.endswith('.jsonl'):
         if Path(file_path).stem.startswith('best_of_n'):
@@ -1508,15 +1824,45 @@ if __name__ == "__main__":
         elif file_path.endswith('.msgpack'):
             with open(file_path, 'rb') as f:
                 results = msgpack.unpackb(f.read())
+
         
-        if n_samples_to_analyse or num_tokens_to_analyse:
+        if args.loop_samples:
+
+            entropy_losses = {} 
+            varentropy_losses = {} 
+            stddentropy_losses = {} 
+
+            for n_samples_to_analyse in reversed([2**n for n in range(0, 8)]):
+            # for n_samples_to_analyse in reversed(range(1, 128, 10)):
+                print('Analysing n_samples:', n_samples_to_analyse)
+
+                for i in tqdm(range(len(results))):
+                    n_samples_to_analyse = min(n_samples_to_analyse, len(results[i]["original_logprobs"]))
+                    results[i]["original_logprobs"] = results[i]["original_logprobs"][:n_samples_to_analyse]
+                    results[i]["surprises"] = results[i]["surprises"][:n_samples_to_analyse]
+                    results[i]["entropies"] = results[i]["entropies"][:n_samples_to_analyse]
+
+                    for idx in range(len(results[i]["original_logprobs"])):
+                        results[i]["original_logprobs"][idx] = results[i]["original_logprobs"][idx][:num_tokens_to_analyse]
+                        results[i]["surprises"][idx] = results[i]["surprises"][idx][:num_tokens_to_analyse]
+                        results[i]["entropies"][idx] = results[i]["entropies"][idx][:num_tokens_to_analyse]
+
+                stddentropy_losses[n_samples_to_analyse] = get_loss_stddentropy_vs_pass_at_1_regression_l1_l2_loss(results)
+                entropy_losses[n_samples_to_analyse] = get_loss_entropy_vs_pass_at_1_regression_l1_l2_loss(results)
+                varentropy_losses[n_samples_to_analyse] = get_loss_varentropy_vs_pass_at_1_regression_l1_l2_loss(results)   
+            
+            plot_losses(entropy_losses, varentropy_losses, stddentropy_losses, Path('data/meta-llama/Llama-3.2-1B-Instruct/best_of_n_completions_analysis'))
+
+            # end the progrma herer
+            exit()
+
+        elif n_samples_to_analyse or num_tokens_to_analyse:
             for i in tqdm(range(len(results))):
                 n_samples_to_analyse = min(n_samples_to_analyse, len(results[i]["original_logprobs"]))
                 results[i]["original_logprobs"] = results[i]["original_logprobs"][:n_samples_to_analyse]
                 results[i]["surprises"] = results[i]["surprises"][:n_samples_to_analyse]
                 results[i]["entropies"] = results[i]["entropies"][:n_samples_to_analyse]
                 for idx in range(len(results[i]["original_logprobs"])):
-                    #num_tokens_to_analyse = min(num_tokens_to_analyse, len(results[i]["original_logprobs"][idx]))
                     results[i]["original_logprobs"][idx] = results[i]["original_logprobs"][idx][:num_tokens_to_analyse]
                     results[i]["surprises"][idx] = results[i]["surprises"][idx][:num_tokens_to_analyse]
                     results[i]["entropies"][idx] = results[i]["entropies"][idx][:num_tokens_to_analyse]
@@ -1524,15 +1870,14 @@ if __name__ == "__main__":
         # Create and save plots
         create_plots(results, output_dir)
         print(f"Plots saved in: {output_dir}")
-    
-    
-    # Print summary of first result as example
-    if results:
-        print("Analysis of first entry:")
-        for key, value in results[0].items():
-            if key in ['original_logprobs', 'max_logprobs_per_token', 
-                       'entropies', 'surprises', 'scores', 'attention_entropies']:
-                print(f"{key}: [...]")  # Skip printing
-            else:
-                print(f"{key}: {value}")
+            
+        # Print summary of first result as example
+        if results:
+            print("Analysis of first entry:")
+            for key, value in results[0].items():
+                if key in ['original_logprobs', 'max_logprobs_per_token', 
+                           'entropies', 'surprises', 'scores', 'attention_entropies']:
+                    print(f"{key}: [...]")  # Skip printing
+                else:
+                    print(f"{key}: {value}")
 
