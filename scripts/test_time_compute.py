@@ -47,6 +47,8 @@ def main():
 
     num_gpus = torch.cuda.device_count()
 
+    dataset = get_dataset(config)
+
     if config.approach != "estimate_difficulty":
         llm = LLM(
             model=config.model_path,
@@ -60,7 +62,6 @@ def main():
         llm = None
         prm = None
 
-    dataset = get_dataset(config)
     dataset = dataset.map(
         approach_fn,
         batched=True,
