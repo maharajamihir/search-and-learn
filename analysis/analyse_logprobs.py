@@ -1445,7 +1445,7 @@ def get_loss_entropy_vs_pass_at_1_regression_l1_l2_loss(results: List[Dict[str, 
     return {'l1_loss': l1_loss, 'l2_loss': l2_loss}
 
 
-def get_loss_stddentropy_vs_pass_at_1_regression_l1_l2_loss(results: List[Dict[str, Any]], output_dir: Path):
+def get_loss_stddentropy_vs_pass_at_1_regression_l1_l2_loss(results: List[Dict[str, Any]], output_dir: Path, n_samples_to_analyse: int):
     # Calculate standard deviation and mean of entropy for each result    
     stddentropies = [np.std([item for sublist in r['entropies'] for item in sublist]) for r in results]
     pass_at_1 = [r['pass@1'] for r in results] 
@@ -1455,8 +1455,8 @@ def get_loss_stddentropy_vs_pass_at_1_regression_l1_l2_loss(results: List[Dict[s
     l1_loss = mean_absolute_error(ground_truth_y, stddentropies)
 
     # save the losses to a json file
-    print('saving losses to json file to directory and file name ', output_dir / f'stddentropy_losses.json')
-    with open(output_dir / f'stddentropy_l1_l2_loss.json', 'w') as f:
+    print('saving losses to json file to directory and file name ', output_dir / f'stddentropy_losses_samples_{n_samples_to_analyse}.json')
+    with open(output_dir / f'stddentropy_l1_l2_loss_samples_{n_samples_to_analyse}.json', 'w') as f:
         json.dump({'l1_loss': l1_loss, 'l2_loss': l2_loss}, f)  
 
     return {'l1_loss': l1_loss, 'l2_loss': l2_loss}
@@ -1573,7 +1573,7 @@ def loop_through_n_samples(results: List[Dict[str, Any]], num_tokens_to_analyse:
 
 ####### THESE ARE OUR ENTRYPOINTS INTO ANALYSIS AND PLOTTING ###########################################################
 
-def create_plots(results: List[Dict[str, Any]], output_dir: Path):
+def create_plots(results: List[Dict[str, Any]], output_dir: Path, n_samples_to_analyse: int):
     """Create all plots and save them to the output directory."""
     # List of plotting functions with their names
     plot_functions = [
@@ -1603,7 +1603,7 @@ def create_plots(results: List[Dict[str, Any]], output_dir: Path):
     # Iterate over the functions and call them with tqdm
     for name, func in tqdm(plot_functions, desc="Generating plots"):
         # print(f"Calling {name}...")
-        func(results, output_dir)
+        func(results, output_dir, n_samples_to_analyse)
     # print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.2")
     # plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.2)
     # print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.1")
@@ -1899,7 +1899,7 @@ if __name__ == "__main__":
                     results[i]["entropies"][idx] = results[i]["entropies"][idx][:num_tokens_to_analyse]
 
         # Create and save plots
-        create_plots(results, output_dir)
+        create_plots(results, output_dir, n_samples_to_analyse)
         print(f"Plots saved in: {output_dir}")
             
         # Print summary of first result as example

@@ -38,14 +38,14 @@ def stdd_entropy_losses_plot_over_all_samples(best_of_n_completions_dir):
     plt.savefig(best_of_n_completions_dir / "stdd_entropy_losses.png")
 
 # temp at x and loss at y
-def stdd_entropy_losses_plot_over_temperature(best_of_n_completions_dir):
+def stdd_entropy_losses_plot_over_temperature(best_of_n_completions_dir, n_samples):
     temperatures = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0]
     l1_losses = []
     l2_losses = []
 
     for temp in temperatures:
         dir_name = f"best_of_n_completions_temp_{temp}_analysis"
-        json_path = best_of_n_completions_dir / dir_name / "stddentropy_l1_l2_loss.json"
+        json_path = best_of_n_completions_dir / dir_name / f"stddentropy_l1_l2_loss_samples_{n_samples}.json"
         
         if json_path.exists():
             with open(json_path, 'r') as f:
@@ -72,14 +72,15 @@ def stdd_entropy_losses_plot_over_temperature(best_of_n_completions_dir):
     fig.tight_layout()
     plt.title('L1 and L2 Losses vs Temperature')
     plt.grid(True)
-    plt.savefig(best_of_n_completions_dir / "stdd_entropy_losses_temperature.png")
+    plt.savefig(best_of_n_completions_dir / f"stdd_entropy_losses_temperature_samples_{n_samples}.png")
 
 if __name__ == "__main__":
     # add argument parser
     parser = argparse.ArgumentParser(description="Plot entropy losses for best of n completions")
     parser.add_argument("--best_of_n_completions_dir", type=str, help="Path to the best of n completions directory")
+    parser.add_argument("--n_samples", type=int, help="Number of samples")
     args = parser.parse_args()
 
     best_of_n_completions_dir = Path(args.best_of_n_completions_dir)
     # stdd_entropy_losses_plot_over_all_samples(best_of_n_completions_dir)
-    stdd_entropy_losses_plot_over_temperature(best_of_n_completions_dir)
+    stdd_entropy_losses_plot_over_temperature(best_of_n_completions_dir, args.n_samples)
