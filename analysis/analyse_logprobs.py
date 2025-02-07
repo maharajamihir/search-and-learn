@@ -67,6 +67,12 @@ def plot_stddentropy_vs_pass_at_1(results: List[Dict[str, Any]], output_dir: Pat
     plt.figure(figsize=(12, 6))
     scatter = plt.scatter(pass_at_1, stddentropies, alpha=0.7, c=mean_entropies, cmap=cmap, norm=norm)
     
+    # save the losses to a json file
+    print('saving losses to json file to directory and file name ', output_dir / f'entropy_losses.json')
+    with open(output_dir / f'pass@1_vs_stddentropy.json', 'w') as f:
+        json.dump({'stddentropy_losses': stddentropy_losses, 'pass_at_1': pass_at_1}, f)  
+
+
     plt.title('Pass@1 vs Stddentropy (color indicates mean entropy)')
     plt.xlabel('Pass@1')
     plt.ylabel('Stddentropy')
@@ -1439,7 +1445,7 @@ def get_loss_entropy_vs_pass_at_1_regression_l1_l2_loss(results: List[Dict[str, 
     return {'l1_loss': l1_loss, 'l2_loss': l2_loss}
 
 
-def get_loss_stddentropy_vs_pass_at_1_regression_l1_l2_loss(results: List[Dict[str, Any]]):
+def get_loss_stddentropy_vs_pass_at_1_regression_l1_l2_loss(results: List[Dict[str, Any]], output_dir: Path):
     # Calculate standard deviation and mean of entropy for each result    
     stddentropies = [np.std([item for sublist in r['entropies'] for item in sublist]) for r in results]
     pass_at_1 = [r['pass@1'] for r in results] 
@@ -1447,6 +1453,11 @@ def get_loss_stddentropy_vs_pass_at_1_regression_l1_l2_loss(results: List[Dict[s
     ground_truth_y = 1 - np.array(pass_at_1)
     l2_loss = mean_squared_error(ground_truth_y, stddentropies)
     l1_loss = mean_absolute_error(ground_truth_y, stddentropies)
+
+    # save the losses to a json file
+    print('saving losses to json file to directory and file name ', output_dir / f'stddentropy_losses.json')
+    with open(output_dir / f'stddentropy_l1_l2_loss.json', 'w') as f:
+        json.dump({'l1_loss': l1_loss, 'l2_loss': l2_loss}, f)  
 
     return {'l1_loss': l1_loss, 'l2_loss': l2_loss}
 
@@ -1523,10 +1534,6 @@ def plot_losses(entropy_losses, varentropy_losses, stddentropy_losses, output_di
     plt.savefig(output_dir / f'stddentropy_losses_plot.png')
     plt.close()
 
-# Example usage
-# plot_losses(entropy_losses, varentropy_losses, stddentropy_losses, Path('data/meta-llama/Llama-3.2-1B-Instruct/best_of_n_completions_analysis'))
-
-
 def loop_through_n_samples(results: List[Dict[str, Any]], num_tokens_to_analyse: int = 15, ) -> Dict[str, Dict[str, float]]:
 
     entropy_losses = {} 
@@ -1586,7 +1593,9 @@ def create_plots(results: List[Dict[str, Any]], output_dir: Path):
         # ("plot_per_head_per_layer_entropies_vs_pass_at_1", plot_per_head_per_layer_entropies_scatter_pass_at_1),
         # ("plot_per_head_per_layer_min_entropies_scatter", plot_per_head_per_layer_min_entropies_scatter),
         # ("plot_per_head_per_layer_min_entropies_scatter_pass_at_1", plot_per_head_per_layer_min_entropies_scatter_pass_at_1),
-        ("plot_stddentropy_vs_pass_at_1", plot_stddentropy_vs_pass_at_1),
+        # ("plot_stddentropy_vs_pass_at_1", plot_stddentropy_vs_pass_at_1),
+        # def get_loss_stddentropy_vs_pass_at_1_regression_l1_l2_loss(results: List[Dict[str, Any]]):
+        ("get_loss_stddentropy_vs_pass_at_1_regression_l1_l2_loss", get_loss_stddentropy_vs_pass_at_1_regression_l1_l2_loss),
 
     ]
 
@@ -1595,74 +1604,74 @@ def create_plots(results: List[Dict[str, Any]], output_dir: Path):
     for name, func in tqdm(plot_functions, desc="Generating plots"):
         # print(f"Calling {name}...")
         func(results, output_dir)
-    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.2")
-    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.2)
-    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.1")
-    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.1)
-    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.05")
-    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.05)
-    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.01")
-    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.01)
-    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.005")
-    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.005)
-    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.001")
-    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.001)
-    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.0005")
-    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.0005)
-    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.0")
-    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.0)
-    print("Plotting lowest quartile logprobs vs pass@1 with threshold 1.0")
-    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 1.0)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.2")
-    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.2)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.1")
-    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.1)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.05")
-    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.05)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.01")
-    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.01)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.005")
-    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.005)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.001")
-    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.001)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.0")
-    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 1.)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.2")
-    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.2)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.1")
-    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.1)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.05")
-    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.05)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.01")
-    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.01)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.005")
-    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.005)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.001")
-    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.001)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.0")
-    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 1.)
+    # print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.2")
+    # plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.2)
+    # print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.1")
+    # plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.1)
+    # print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.05")
+    # plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.05)
+    # print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.01")
+    # plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.01)
+    # print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.005")
+    # plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.005)
+    # print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.001")
+    # plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.001)
+    # print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.0005")
+    # plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.0005)
+    # print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.0")
+    # plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.0)
+    # print("Plotting lowest quartile logprobs vs pass@1 with threshold 1.0")
+    # plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 1.0)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.2")
+    # plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.2)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.1")
+    # plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.1)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.05")
+    # plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.05)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.01")
+    # plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.01)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.005")
+    # plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.005)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.001")
+    # plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.001)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.0")
+    # plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 1.)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.2")
+    # plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.2)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.1")
+    # plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.1)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.05")
+    # plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.05)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.01")
+    # plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.01)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.005")
+    # plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.005)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.001")
+    # plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.001)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.0")
+    # plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 1.)
 
-    print("Plotting entropy vs sequence length")
-    plot_lowest_quartile_entropy_vs_seq_len(results, output_dir, 1.)
-    print("Plotting surprise vs sequence length")
-    plot_lowest_quartile_surprise_vs_seq_len(results, output_dir, 1.)
-    print("Plotting entropy vs sequence length")
-    plot_lowest_quartile_entropy_vs_seq_len(results, output_dir, 0.)
-    print("Plotting surprise vs sequence length")
-    plot_lowest_quartile_surprise_vs_seq_len(results, output_dir, 0.)
+    # print("Plotting entropy vs sequence length")
+    # plot_lowest_quartile_entropy_vs_seq_len(results, output_dir, 1.)
+    # print("Plotting surprise vs sequence length")
+    # plot_lowest_quartile_surprise_vs_seq_len(results, output_dir, 1.)
+    # print("Plotting entropy vs sequence length")
+    # plot_lowest_quartile_entropy_vs_seq_len(results, output_dir, 0.)
+    # print("Plotting surprise vs sequence length")
+    # plot_lowest_quartile_surprise_vs_seq_len(results, output_dir, 0.)
 
-    print("Plotting entropy vs sequence length")
-    plot_lowest_quartile_entropy_vs_seq_len(results, output_dir, 0.5)
-    print("Plotting surprise vs sequence length")
-    plot_lowest_quartile_surprise_vs_seq_len(results, output_dir, 0.5)
-    print("Plotting entropy vs sequence length")
-    plot_lowest_quartile_entropy_vs_seq_len(results, output_dir, 0.33)
-    print("Plotting surprise vs sequence length")
-    plot_lowest_quartile_surprise_vs_seq_len(results, output_dir, 0.33)
+    # print("Plotting entropy vs sequence length")
+    # plot_lowest_quartile_entropy_vs_seq_len(results, output_dir, 0.5)
+    # print("Plotting surprise vs sequence length")
+    # plot_lowest_quartile_surprise_vs_seq_len(results, output_dir, 0.5)
+    # print("Plotting entropy vs sequence length")
+    # plot_lowest_quartile_entropy_vs_seq_len(results, output_dir, 0.33)
+    # print("Plotting surprise vs sequence length")
+    # plot_lowest_quartile_surprise_vs_seq_len(results, output_dir, 0.33)
 
-    plot_agg_scores_mean_vs_pass_at_1(results, output_dir, "last")
-    plot_agg_scores_mean_vs_pass_at_1(results, output_dir, "min")
-    plot_agg_scores_mean_vs_pass_at_1(results, output_dir, "prod")
+    # plot_agg_scores_mean_vs_pass_at_1(results, output_dir, "last")
+    # plot_agg_scores_mean_vs_pass_at_1(results, output_dir, "min")
+    # plot_agg_scores_mean_vs_pass_at_1(results, output_dir, "prod")
 
     # for i in tqdm(range(100), desc="Plotting per token logprobs"):
         # plot_per_token_logprobs_for_ith_problem(results, output_dir, i)
@@ -1778,9 +1787,6 @@ def analyze_logprobs(file_path: str, num_tokens_to_analyse: int) -> List[Dict[st
 
     return results
 
-
-# def combined_plot(best_of_n_completions_dir: Path):
-    
 
 if __name__ == "__main__":
     import argparse
