@@ -1727,6 +1727,14 @@ def analyze_logprobs(file_path: str, num_tokens_to_analyse: int) -> List[Dict[st
             if "list_length" in data.keys():
                 num_correct = sum([1 if str(data["answer"]) in compl else 0 for compl in data["completions"]])
                 pass_at_1 = num_correct/len(data["completions"])
+
+            # Calculate difficulty as the standard deviation of the entropies
+            difficulty =  np.std([item for sublist in entropies for item in sublist])
+
+            # set all difficulties greater than 0.8 to zero
+            difficulty = 0.0 if difficulty > 0.8 else difficulty
+
+
             analysis = {
                 'unique_id': data.get('unique_id', None),
                 'problem': data.get('problem', None),
@@ -1739,8 +1747,8 @@ def analyze_logprobs(file_path: str, num_tokens_to_analyse: int) -> List[Dict[st
                 'avg_logprob_per_token': float(np.mean([np.mean(probs) for gen in log_probs for probs in gen])),
                 'entropies': entropies,
                 'surprises': surprises,
-                'difficulty': np.std([item for sublist in entropies for item in sublist]),
                 'avg_entropy': float(np.mean([item for sublist in entropies for item in sublist])),
+                'difficulty': difficulty,
                 'pass@1': pass_at_1,
                 'mean_score': data.get('mean_score', None),
                 'level_mean': data.get('level_mean', None),
@@ -1756,8 +1764,13 @@ def analyze_logprobs(file_path: str, num_tokens_to_analyse: int) -> List[Dict[st
             
             results.append(analysis)
     
-    return results
+    
+    mean_difficulty = np.mean([result['difficulty'] for result in results])
+    for i, result in enumerate(results):
+        results[i]['difficulty'] = mean_difficulty
+        # print(results[i]['difficulty'])
 
+    return results
 
 
 
