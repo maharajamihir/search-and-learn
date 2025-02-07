@@ -7,6 +7,8 @@ import msgpack
 from pathlib import Path
 import torch
 import torch.nn.functional as F
+import re
+import random
 
 from sal.utils.score import aggregate_scores
 
@@ -1042,6 +1044,217 @@ def plot_lowest_cutoff_logprobs_vs_pass_at_1(results: List[Dict[str, Any]], outp
     plt.savefig(output_dir / f'pass_at_1_vs_below_cutoff_{cutoff_value}.png')
     plt.close()
 
+def _extract_solution_from_string(strings):
+    solutions = []
+    for s in strings:
+        match = re.search(r'\d+', s)
+        if match:
+            solutions.append(int(match.group()))
+        else:
+            solutions.append(-1)
+    return solutions
+
+def plot_adaptive_pass_at_n(results: List[Dict[str, Any]], output_dir: Path):
+    budgets = range(32, 128, 4)
+
+    accuracy_difficulties = []
+    accuracy_difficulties_clipped = []
+    accuracy_prm_score = []
+    accuracy_constant = []
+
+    for mu in budgets:
+        difficulties = np.array([r['difficulty'] for r in results])
+        n_difficulties = (difficulties/np.mean(difficulties)) * mu
+
+        difficulties_clipped = np.array([r['difficulty_clipped'] for r in results])
+        n_difficulties_clipped = ((difficulties_clipped/np.mean(difficulties_clipped)) * mu)
+
+        agg_scores_last_mean = np.array([1-r['agg_scores_last_mean'] for r in results])
+        n_agg_scores_last_mean = (agg_scores_last_mean/np.mean(agg_scores_last_mean)) * mu
+
+        num_correct_difficulties = 0
+        num_correct_difficulties_clipped = 0
+        num_correct_prm_scores = 0
+        num_correct_constant = 0
+
+        for idx, problem in enumerate(results):
+            answer_candidates = _extract_solution_from_string(problem["completions"])
+            gt_answer = problem['answer']
+
+            if gt_answer in answer_candidates[:int(n_difficulties[idx])]:
+                num_correct_difficulties += 1
+
+            if gt_answer in answer_candidates[:int(n_difficulties_clipped[idx])]:
+                num_correct_difficulties_clipped += 1
+
+            if gt_answer in answer_candidates[:int(n_agg_scores_last_mean[idx])]:
+                num_correct_prm_scores += 1
+
+            if gt_answer in answer_candidates[:mu]:
+                num_correct_constant += 1
+
+        accuracy_difficulties.append(num_correct_difficulties)
+        accuracy_difficulties_clipped.append(num_correct_difficulties_clipped)
+        accuracy_prm_score.append(num_correct_prm_scores)
+        accuracy_constant.append(num_correct_constant)
+
+    
+    # plot budget against all accuracies (accuracies are lines). budget is x axis.
+    plt.figure(figsize=(10, 6))
+    plt.plot(budgets, accuracy_difficulties, label='Suprise based difficulty', marker='o')
+    plt.plot(budgets, accuracy_difficulties_clipped, label='Surprise based difficulty (clipped)', marker='o')
+    plt.plot(budgets, accuracy_prm_score, label='PRM Score based difficulty', marker='o')
+    plt.plot(budgets, accuracy_constant, label='Constant difficulty', marker='o')
+
+    plt.title('Adaptive pass@n vs mean budget')
+    plt.xlabel('Budget (mean number of generations)')
+    plt.ylabel('Number of Correct Answers')
+    plt.legend(loc='upper left')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(output_dir / 'pass_at_n_accuracy_vs_budget.png')
+    plt.close()
+
+def plot_adaptive_maj_at_n(results: List[Dict[str, Any]], output_dir: Path):
+    budgets = range(32, 128, 4)
+
+    accuracy_difficulties = []
+    accuracy_difficulties_clipped = []
+    accuracy_prm_score = []
+    accuracy_constant = []
+
+    for mu in budgets:
+        difficulties = np.array([r['difficulty'] for r in results])
+        n_difficulties = (difficulties/np.mean(difficulties)) * mu
+
+        difficulties_clipped = np.array([r['difficulty_clipped'] for r in results])
+        n_difficulties_clipped = ((difficulties_clipped/np.mean(difficulties_clipped)) * mu)
+
+        agg_scores_last_mean = np.array([1-r['agg_scores_last_mean'] for r in results])
+        n_agg_scores_last_mean = (agg_scores_last_mean/np.mean(agg_scores_last_mean)) * mu
+
+        num_correct_difficulties = 0
+        num_correct_difficulties_clipped = 0
+        num_correct_prm_scores = 0
+        num_correct_constant = 0
+
+        for idx, problem in enumerate(results):
+            answer_candidates = _extract_solution_from_string(problem["completions"])
+            gt_answer = problem['answer']
+
+            if answer_candidates[:int(n_difficulties[idx])]:
+                majority_vote_difficulties = max(set(answer_candidates[:int(n_difficulties[idx])]), key=answer_candidates[:int(n_difficulties[idx])].count)
+                if majority_vote_difficulties == gt_answer:
+                    num_correct_difficulties += 1
+
+            if answer_candidates[:int(n_difficulties_clipped[idx])]:
+                majority_vote_difficulties_clipped = max(set(answer_candidates[:int(n_difficulties_clipped[idx])]), key=answer_candidates[:int(n_difficulties_clipped[idx])].count)
+                if majority_vote_difficulties_clipped == gt_answer:
+                    num_correct_difficulties_clipped += 1
+
+            if answer_candidates[:int(n_agg_scores_last_mean[idx])]:
+                majority_vote_prm_scores = max(set(answer_candidates[:int(n_agg_scores_last_mean[idx])]), key=answer_candidates[:int(n_agg_scores_last_mean[idx])].count)
+                if majority_vote_prm_scores == gt_answer:
+                    num_correct_prm_scores += 1
+
+            if answer_candidates[:mu]:
+                majority_vote_constant = max(set(answer_candidates[:mu]), key=answer_candidates[:mu].count)
+                if majority_vote_constant == gt_answer:
+                    num_correct_constant += 1
+
+        accuracy_difficulties.append(num_correct_difficulties)
+        accuracy_difficulties_clipped.append(num_correct_difficulties_clipped)
+        accuracy_prm_score.append(num_correct_prm_scores)
+        accuracy_constant.append(num_correct_constant)
+
+    
+    # plot budget against all accuracies (accuracies are lines). budget is x axis.
+    plt.figure(figsize=(10, 6))
+    plt.plot(budgets, accuracy_difficulties, label='Suprise based difficulty', marker='o')
+    plt.plot(budgets, accuracy_difficulties_clipped, label='Surprise based difficulty (clipped)', marker='o')
+    plt.plot(budgets, accuracy_prm_score, label='PRM Score based difficulty', marker='o')
+    plt.plot(budgets, accuracy_constant, label='Constant difficulty', marker='o')
+
+    plt.title('Adaptive maj@n vs mean budget')
+    plt.xlabel('Budget (mean number of generations)')
+    plt.ylabel('Number of Correct Answers')
+    plt.legend(loc='upper left')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(output_dir / 'maj_at_n_accuracy_vs_budget.png')
+    plt.close()
+
+def plot_adaptive_best_of_n(results: List[Dict[str, Any]], output_dir: Path):
+    budgets = range(32, 128, 4)
+
+    accuracy_difficulties = []
+    accuracy_difficulties_clipped = []
+    accuracy_prm_score = []
+    accuracy_constant = []
+
+    for mu in budgets:
+        difficulties = np.array([r['difficulty'] for r in results])
+        n_difficulties = (difficulties/np.mean(difficulties)) * mu
+
+        difficulties_clipped = np.array([r['difficulty_clipped'] for r in results])
+        n_difficulties_clipped = ((difficulties_clipped/np.mean(difficulties_clipped)) * mu)
+
+        agg_scores_last_mean = np.array([1-r['agg_scores_last_mean'] for r in results])
+        n_agg_scores_last_mean = (agg_scores_last_mean/np.mean(agg_scores_last_mean)) * mu
+
+        #scores = [[gen[0] for gen in r['scores']] for r in results]
+
+        num_correct_difficulties = 0
+        num_correct_difficulties_clipped = 0
+        num_correct_prm_scores = 0
+        num_correct_constant = 0
+
+        for idx, problem in enumerate(results):
+            answer_candidates = _extract_solution_from_string(problem["completions"])
+            gt_answer = problem['answer']
+
+            if answer_candidates[:int(n_difficulties[idx])]:
+                highest_score_idx = np.argmax(scores[idx][:int(n_difficulties[idx])])
+                if answer_candidates[highest_score_idx] == gt_answer:
+                    num_correct_difficulties += 1
+
+            if answer_candidates[:int(n_difficulties_clipped[idx])]:
+                highest_score_idx_clipped = np.argmax(scores[idx][:int(n_difficulties_clipped[idx])])
+                if answer_candidates[highest_score_idx_clipped] == gt_answer:
+                    num_correct_difficulties_clipped += 1
+
+            if answer_candidates[:int(n_agg_scores_last_mean[idx])]:
+                highest_score_idx_prm = np.argmax(scores[idx][:int(n_agg_scores_last_mean[idx])])
+                if answer_candidates[highest_score_idx_prm] == gt_answer:
+                    num_correct_prm_scores += 1
+
+            if answer_candidates[:mu]:
+                highest_score_idx_constant = np.argmax(scores[idx][:mu])
+                if answer_candidates[highest_score_idx_constant] == gt_answer:
+                    num_correct_constant += 1
+
+        accuracy_difficulties.append(num_correct_difficulties)
+        accuracy_difficulties_clipped.append(num_correct_difficulties_clipped)
+        accuracy_prm_score.append(num_correct_prm_scores)
+        accuracy_constant.append(num_correct_constant)
+
+    
+    # plot budget against all accuracies (accuracies are lines). budget is x axis.
+    plt.figure(figsize=(10, 6))
+    plt.plot(budgets, accuracy_difficulties, label='Suprise based difficulty', marker='o')
+    plt.plot(budgets, accuracy_difficulties_clipped, label='Surprise based difficulty (clipped)', marker='o')
+    plt.plot(budgets, accuracy_prm_score, label='PRM Score based difficulty', marker='o')
+    plt.plot(budgets, accuracy_constant, label='Constant difficulty', marker='o')
+
+    plt.title('Adaptive best-of-n vs mean budget')
+    plt.xlabel('Budget (mean number of generations)')
+    plt.ylabel('Number of Correct Answers')
+    plt.legend(loc='upper left')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(output_dir / 'best_of_n_accuracy_vs_budget.png')
+    plt.close()
+
 #############################################################################################################################
 
 
@@ -1265,7 +1478,10 @@ def create_plots(results: List[Dict[str, Any]], output_dir: Path):
         # ("plot_per_head_per_layer_entropies_vs_pass_at_1", plot_per_head_per_layer_entropies_scatter_pass_at_1),
         # ("plot_per_head_per_layer_min_entropies_scatter", plot_per_head_per_layer_min_entropies_scatter),
         # ("plot_per_head_per_layer_min_entropies_scatter_pass_at_1", plot_per_head_per_layer_min_entropies_scatter_pass_at_1),
-        ("plot_stddentropy_vs_pass_at_1", plot_stddentropy_vs_pass_at_1),
+        # ("plot_stddentropy_vs_pass_at_1", plot_stddentropy_vs_pass_at_1),
+        ("plot_adaptive_pass_at_n", plot_adaptive_pass_at_n),
+        ("plot_adaptive_maj_at_n", plot_adaptive_maj_at_n),
+        ("plot_adaptive_best_of_n", plot_adaptive_best_of_n)
 
     ]
 
@@ -1274,74 +1490,74 @@ def create_plots(results: List[Dict[str, Any]], output_dir: Path):
     for name, func in tqdm(plot_functions, desc="Generating plots"):
         # print(f"Calling {name}...")
         func(results, output_dir)
-    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.2")
-    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.2)
-    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.1")
-    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.1)
-    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.05")
-    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.05)
-    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.01")
-    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.01)
-    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.005")
-    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.005)
-    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.001")
-    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.001)
-    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.0005")
-    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.0005)
-    print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.0")
-    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.0)
-    print("Plotting lowest quartile logprobs vs pass@1 with threshold 1.0")
-    plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 1.0)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.2")
-    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.2)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.1")
-    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.1)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.05")
-    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.05)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.01")
-    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.01)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.005")
-    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.005)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.001")
-    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.001)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.0")
-    plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 1.)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.2")
-    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.2)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.1")
-    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.1)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.05")
-    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.05)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.01")
-    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.01)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.005")
-    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.005)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.001")
-    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.001)
-    print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.0")
-    plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 1.)
+    # print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.2")
+    # plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.2)
+    # print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.1")
+    # plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.1)
+    # print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.05")
+    # plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.05)
+    # print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.01")
+    # plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.01)
+    # print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.005")
+    # plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.005)
+    # print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.001")
+    # plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.001)
+    # print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.0005")
+    # plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.0005)
+    # print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.0")
+    # plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.0)
+    # print("Plotting lowest quartile logprobs vs pass@1 with threshold 1.0")
+    # plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 1.0)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.2")
+    # plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.2)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.1")
+    # plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.1)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.05")
+    # plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.05)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.01")
+    # plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.01)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.005")
+    # plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.005)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.001")
+    # plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 0.001)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.0")
+    # plot_lowest_quartile_surprise_vs_pass_at_1(results, output_dir, 1.)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.2")
+    # plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.2)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.1")
+    # plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.1)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.05")
+    # plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.05)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.01")
+    # plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.01)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.005")
+    # plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.005)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.001")
+    # plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 0.001)
+    # print("Plotting lowest quartile reverse entropy vs pass@1 with threshold 0.0")
+    # plot_lowest_quartile_entropy_vs_pass_at_1(results, output_dir, 1.)
 
-    print("Plotting entropy vs sequence length")
-    plot_lowest_quartile_entropy_vs_seq_len(results, output_dir, 1.)
-    print("Plotting surprise vs sequence length")
-    plot_lowest_quartile_surprise_vs_seq_len(results, output_dir, 1.)
-    print("Plotting entropy vs sequence length")
-    plot_lowest_quartile_entropy_vs_seq_len(results, output_dir, 0.)
-    print("Plotting surprise vs sequence length")
-    plot_lowest_quartile_surprise_vs_seq_len(results, output_dir, 0.)
+    # print("Plotting entropy vs sequence length")
+    # plot_lowest_quartile_entropy_vs_seq_len(results, output_dir, 1.)
+    # print("Plotting surprise vs sequence length")
+    # plot_lowest_quartile_surprise_vs_seq_len(results, output_dir, 1.)
+    # print("Plotting entropy vs sequence length")
+    # plot_lowest_quartile_entropy_vs_seq_len(results, output_dir, 0.)
+    # print("Plotting surprise vs sequence length")
+    # plot_lowest_quartile_surprise_vs_seq_len(results, output_dir, 0.)
 
-    print("Plotting entropy vs sequence length")
-    plot_lowest_quartile_entropy_vs_seq_len(results, output_dir, 0.5)
-    print("Plotting surprise vs sequence length")
-    plot_lowest_quartile_surprise_vs_seq_len(results, output_dir, 0.5)
-    print("Plotting entropy vs sequence length")
-    plot_lowest_quartile_entropy_vs_seq_len(results, output_dir, 0.33)
-    print("Plotting surprise vs sequence length")
-    plot_lowest_quartile_surprise_vs_seq_len(results, output_dir, 0.33)
+    # print("Plotting entropy vs sequence length")
+    # plot_lowest_quartile_entropy_vs_seq_len(results, output_dir, 0.5)
+    # print("Plotting surprise vs sequence length")
+    # plot_lowest_quartile_surprise_vs_seq_len(results, output_dir, 0.5)
+    # print("Plotting entropy vs sequence length")
+    # plot_lowest_quartile_entropy_vs_seq_len(results, output_dir, 0.33)
+    # print("Plotting surprise vs sequence length")
+    # plot_lowest_quartile_surprise_vs_seq_len(results, output_dir, 0.33)
 
-    plot_agg_scores_mean_vs_pass_at_1(results, output_dir, "last")
-    plot_agg_scores_mean_vs_pass_at_1(results, output_dir, "min")
-    plot_agg_scores_mean_vs_pass_at_1(results, output_dir, "prod")
+    # plot_agg_scores_mean_vs_pass_at_1(results, output_dir, "last")
+    # plot_agg_scores_mean_vs_pass_at_1(results, output_dir, "min")
+    # plot_agg_scores_mean_vs_pass_at_1(results, output_dir, "prod")
 
     # for i in tqdm(range(100), desc="Plotting per token logprobs"):
         # plot_per_token_logprobs_for_ith_problem(results, output_dir, i)
@@ -1412,8 +1628,16 @@ def analyze_logprobs(file_path: str, num_tokens_to_analyse: int) -> List[Dict[st
             if "list_length" in data.keys():
                 num_correct = sum([1 if str(data["answer"]) in compl else 0 for compl in data["completions"]])
                 pass_at_1 = num_correct/len(data["completions"])
+
+            estimation_entropies = entropies[:4]            
+            difficulty = np.std([item for sublist in estimation_entropies for item in sublist])
+            difficulty_clipped = 0 if difficulty > 0.8 else difficulty
+
+
             analysis = {
                 'unique_id': data.get('unique_id', None),
+                'answer': data.get('answer', None),
+                'completions': data.get('completions', []),
                 'problem': data.get('problem', None),
                 'level': data.get('level', None),
                 'list_length': data.get('seq_len', None),
@@ -1424,13 +1648,16 @@ def analyze_logprobs(file_path: str, num_tokens_to_analyse: int) -> List[Dict[st
                 'avg_logprob_per_token': float(np.mean([np.mean(probs) for gen in log_probs for probs in gen])),
                 'entropies': entropies,
                 'surprises': surprises,
-                'difficulty': np.std([item for sublist in entropies for item in sublist]),
+                'difficulty': difficulty,
+                'difficulty_clipped': difficulty_clipped,
+                #'answer_candidates': answer_candidates,
                 'avg_entropy': float(np.mean([item for sublist in entropies for item in sublist])),
                 'pass@1': pass_at_1,
                 'mean_score': data.get('mean_score', None),
                 'level_mean': data.get('level_mean', None),
                 'level_pass': data.get('level_pass', None),
                 'scores': data.get('scores', None),
+                'agg_scores_last': agg_scores_last,
                 'agg_scores_min_mean': float(np.mean(agg_scores_min)),
                 'agg_scores_min_std': float(np.std(agg_scores_min)),
                 'agg_scores_prod_mean': float(np.mean(agg_scores_prod)),
@@ -1451,6 +1678,8 @@ if __name__ == "__main__":
         sys.exit(1)
 
     file_path = sys.argv[1]
+
+    random.seed(42)
 
     num_tokens_to_analyse = None  # Default value
 
