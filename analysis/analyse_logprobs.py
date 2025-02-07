@@ -11,6 +11,7 @@ from sklearn.linear_model import LinearRegression
 
 from sal.utils.score import aggregate_scores
 from sklearn.metrics import mean_squared_error, mean_absolute_error
+import csv 
 
 ##########################################################################################################################
 
@@ -1463,6 +1464,11 @@ def plot_losses(entropy_losses, varentropy_losses, stddentropy_losses, output_di
     stddentropy_l1 = [stddentropy_losses[sample]['l1_loss'] for sample in sample_sizes]
     stddentropy_l2 = [stddentropy_losses[sample]['l2_loss'] for sample in sample_sizes]
 
+    # save the losses to a json file
+    print('saving losses to json file to directory and file name ', output_dir / f'entropy_losses.json')
+    with open(output_dir / f'entropy_losses.json', 'w') as f:
+        json.dump({'entropy_l1': entropy_l1, 'entropy_l2': entropy_l2, 'varentropy_l1': varentropy_l1, 'varentropy_l2': varentropy_l2, 'stddentropy_l1': stddentropy_l1, 'stddentropy_l2': stddentropy_l2}, f)  
+
     # Ensure the output directory exists
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1480,7 +1486,7 @@ def plot_losses(entropy_losses, varentropy_losses, stddentropy_losses, output_di
     ax2.set_ylabel('L2 Loss', color='m')
 
     fig.tight_layout()
-    plt.savefig(output_dir / 'entropy_losses_plot.png')
+    plt.savefig(output_dir / f'entropy_losses_plot.png')
     plt.close()
 
     # Plot and save for varentropy losses
@@ -1497,7 +1503,7 @@ def plot_losses(entropy_losses, varentropy_losses, stddentropy_losses, output_di
     ax2.set_ylabel('L2 Loss', color='m')
 
     fig.tight_layout()
-    plt.savefig(output_dir / 'varentropy_losses_plot.png')
+    plt.savefig(output_dir / f'varentropy_losses_plot.png')
     plt.close()
 
     # Plot and save for stddentropy losses
@@ -1514,7 +1520,7 @@ def plot_losses(entropy_losses, varentropy_losses, stddentropy_losses, output_di
     ax2.set_ylabel('L2 Loss', color='m')
 
     fig.tight_layout()
-    plt.savefig(output_dir / 'stddentropy_losses_plot.png')
+    plt.savefig(output_dir / f'stddentropy_losses_plot.png')
     plt.close()
 
 # Example usage
@@ -1773,7 +1779,8 @@ def analyze_logprobs(file_path: str, num_tokens_to_analyse: int) -> List[Dict[st
     return results
 
 
-
+# def combined_plot(best_of_n_completions_dir: Path):
+    
 
 if __name__ == "__main__":
     import argparse
@@ -1783,10 +1790,12 @@ if __name__ == "__main__":
     from tqdm import tqdm
 
     parser = argparse.ArgumentParser(description="Analyze log probabilities from a JSONL file.")
-    parser.add_argument("file_path", type=str, help="Path to the JSONL file.")
+    parser.add_argument("--file_path", type=str, help="Path to the JSONL file.")
     parser.add_argument("--num_tokens", type=int, default=None, help="Number of tokens to analyze.")
     parser.add_argument("--n_samples", type=int, default=None, help="Number of samples to analyze.")
     parser.add_argument("--loop_samples", action='store_true', help="Run loop through n_samples to calculate losses.")
+    parser.add_argument("--temperature", type=str, default='default', help="Temperature to use for the analysis.")
+
 
     args = parser.parse_args()
 
@@ -1811,7 +1820,7 @@ if __name__ == "__main__":
         output_dir = Path(file_path).parent / (Path(file_path).stem + '_analysis')
         # Save results to JSON file
         output_dir.mkdir(exist_ok=True)
-        output_msgpack = output_dir / 'analysis.msgpack'
+        output_msgpack = output_dir / f'analysis.msgpack'
         with open(output_msgpack, 'wb') as f:
             packed = msgpack.packb(results)
             f.write(packed)
@@ -1831,7 +1840,7 @@ if __name__ == "__main__":
             with open(file_path, 'r') as f:
                 results = json.load(f)
             # Save results to msgpack file
-            output_msgpack = output_dir / 'analysis.msgpack'
+            output_msgpack = output_dir / f'analysis.msgpack'
             with open(output_msgpack, 'wb') as f:
                 packed = msgpack.packb(results)
                 f.write(packed)
@@ -1842,7 +1851,7 @@ if __name__ == "__main__":
 
         
         if args.loop_samples:
-
+            print("Looping through n_samples to analyse")
             entropy_losses = {} 
             varentropy_losses = {} 
             stddentropy_losses = {} 
@@ -1866,7 +1875,8 @@ if __name__ == "__main__":
                 entropy_losses[n_samples_to_analyse] = get_loss_entropy_vs_pass_at_1_regression_l1_l2_loss(results)
                 varentropy_losses[n_samples_to_analyse] = get_loss_varentropy_vs_pass_at_1_regression_l1_l2_loss(results)   
             
-            plot_losses(entropy_losses, varentropy_losses, stddentropy_losses, Path('data/meta-llama/Llama-3.2-1B-Instruct/best_of_n_completions_analysis'))
+            file_path = Path(file_path).parent 
+            plot_losses(entropy_losses, varentropy_losses, stddentropy_losses, file_path)
 
             # end the progrma herer
             exit()
