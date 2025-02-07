@@ -1255,6 +1255,51 @@ def plot_adaptive_best_of_n(results: List[Dict[str, Any]], output_dir: Path):
     plt.savefig(output_dir / 'best_of_n_accuracy_vs_budget.png')
     plt.close()
 
+
+def calculate_pass_at_n(results: List[Dict[str, Any]], n: int, output_dir: Path):
+    difficulties = np.array([r['difficulty'] for r in results])
+    n_difficulties = (difficulties/np.mean(difficulties)) * n
+
+    difficulties_clipped = np.array([r['difficulty_clipped'] for r in results])
+    n_difficulties_clipped = ((difficulties_clipped/np.mean(difficulties_clipped)) * n)
+
+    num_correct_difficulties = 0
+    num_correct_difficulties_clipped = 0
+    num_correct_constant = 0
+
+    for idx, problem in enumerate(results):
+        answer_candidates = _extract_solution_from_string(problem["completions"])
+        gt_answer = problem['answer']
+
+        if gt_answer in answer_candidates[:int(n_difficulties[idx])]:
+            num_correct_difficulties += 1
+
+        if gt_answer in answer_candidates[:int(n_difficulties_clipped[idx])]:
+            num_correct_difficulties_clipped += 1
+
+        if gt_answer in answer_candidates[:n]:
+            num_correct_constant += 1
+
+    print(f"Pass@n: {num_correct_difficulties}, Pass@n (clipped): {num_correct_difficulties_clipped}, Pass@n (constant): {num_correct_constant}")
+
+    # Read existing data from the JSON file
+    json_file_path = output_dir.parent / 'pass_at_n_temp_ablation.json'
+    if json_file_path.exists():
+        with open(json_file_path, 'r') as f:
+            existing_data = json.load(f)
+    else:
+        existing_data = {}
+
+    # Update the existing data with new results
+    new_data = {str(output_dir): {str(n): {'pass_at_n': num_correct_difficulties, 'pass_at_n_clipped': num_correct_difficulties_clipped, 'pass_at_n_constant': num_correct_constant}}}
+    existing_data.update(new_data)
+
+    # Write the updated data back to the JSON file
+    with open(json_file_path, 'w') as f:
+        json.dump(existing_data, f, indent=4)
+
+    return num_correct_difficulties, num_correct_difficulties_clipped, num_correct_constant
+
 #############################################################################################################################
 
 
@@ -1479,9 +1524,9 @@ def create_plots(results: List[Dict[str, Any]], output_dir: Path):
         # ("plot_per_head_per_layer_min_entropies_scatter", plot_per_head_per_layer_min_entropies_scatter),
         # ("plot_per_head_per_layer_min_entropies_scatter_pass_at_1", plot_per_head_per_layer_min_entropies_scatter_pass_at_1),
         # ("plot_stddentropy_vs_pass_at_1", plot_stddentropy_vs_pass_at_1),
-        ("plot_adaptive_pass_at_n", plot_adaptive_pass_at_n),
-        ("plot_adaptive_maj_at_n", plot_adaptive_maj_at_n),
-        ("plot_adaptive_best_of_n", plot_adaptive_best_of_n)
+        # ("plot_adaptive_pass_at_n", plot_adaptive_pass_at_n),
+        # ("plot_adaptive_maj_at_n", plot_adaptive_maj_at_n),
+        # ("plot_adaptive_best_of_n", plot_adaptive_best_of_n)
 
     ]
 
@@ -1490,6 +1535,10 @@ def create_plots(results: List[Dict[str, Any]], output_dir: Path):
     for name, func in tqdm(plot_functions, desc="Generating plots"):
         # print(f"Calling {name}...")
         func(results, output_dir)
+    
+    calculate_pass_at_n(results, 16, output_dir)
+    
+
     # print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.2")
     # plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.2)
     # print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.1")
