@@ -31,10 +31,10 @@ echo "================================================"
 echo "================================================"
 
 
-CUDA_VISIBLE_DEVICES=0 python scripts/test_time_compute.py analysis/dispersion_toy_example.yaml --approach=best_of_n_tmp_0.0 --temperature=0.0 --search_batch_size=1 > logs_ttt/slurm_0_%j.log 2>&1 & 
-CUDA_VISIBLE_DEVICES=1 python scripts/test_time_compute.py analysis/dispersion_toy_example.yaml --approach=best_of_n_tmp_0.2 --temperature=0.2 --search_batch_size=1 > logs_ttt/slurm_1_%j.log 2>&1 &
-CUDA_VISIBLE_DEVICES=2 python scripts/test_time_compute.py analysis/dispersion_toy_example.yaml --approach=best_of_n_tmp_0.4 --temperature=0.4 --search_batch_size=1 > logs_ttt/slurm_2_%j.log 2>&1 &
-CUDA_VISIBLE_DEVICES=3 python scripts/test_time_compute.py analysis/dispersion_toy_example.yaml --approach=best_of_n_tmp_0.6 --temperature=0.6 --search_batch_size=1 > logs_ttt/slurm_3_%j.log 2>&1 &
+CUDA_VISIBLE_DEVICES=0 python scripts/test_time_compute.py analysis/dispersion_toy_example.yaml  --temperature=0.0 --search_batch_size=1 > logs_ttt/slurm_0_%j.log 2>&1 & 
+CUDA_VISIBLE_DEVICES=1 python scripts/test_time_compute.py analysis/dispersion_toy_example.yaml  --temperature=0.2 --search_batch_size=1 > logs_ttt/slurm_1_%j.log 2>&1 &
+CUDA_VISIBLE_DEVICES=2 python scripts/test_time_compute.py analysis/dispersion_toy_example.yaml  --temperature=0.4 --search_batch_size=1 > logs_ttt/slurm_2_%j.log 2>&1 &
+CUDA_VISIBLE_DEVICES=3 python scripts/test_time_compute.py analysis/dispersion_toy_example.yaml  --temperature=0.6 --search_batch_size=1 > logs_ttt/slurm_3_%j.log 2>&1 &
 
 # Wait for all background processes to complete
 wait
@@ -53,10 +53,10 @@ echo "================================================"
 echo "================================================"
 
 
-CUDA_VISIBLE_DEVICES=0 python scripts/test_time_compute.py analysis/dispersion_toy_example.yaml --approach=best_of_n_tmp_0.8 --temperature=0.8 --search_batch_size=1 > logs_ttt/slurm_4_%j.log 2>&1 &
-CUDA_VISIBLE_DEVICES=1 python scripts/test_time_compute.py analysis/dispersion_toy_example.yaml --approach=best_of_n_tmp_1.0 --temperature=1.0 --search_batch_size=1 > logs_ttt/slurm_5_%j.log 2>&1 &
-CUDA_VISIBLE_DEVICES=2 python scripts/test_time_compute.py analysis/dispersion_toy_example.yaml --approach=best_of_n_tmp_1.2 --temperature=1.2 --search_batch_size=1 > logs_ttt/slurm_6_%j.log 2>&1 &
-CUDA_VISIBLE_DEVICES=3 python scripts/test_time_compute.py analysis/dispersion_toy_example.yaml --approach=best_of_n_tmp_1.4 --temperature=1.4 --search_batch_size=1 > logs_ttt/slurm_7_%j.log 2>&1 &
+CUDA_VISIBLE_DEVICES=0 python scripts/test_time_compute.py analysis/dispersion_toy_example.yaml  --temperature=0.8 --search_batch_size=1 > logs_ttt/slurm_4_%j.log 2>&1 &
+CUDA_VISIBLE_DEVICES=1 python scripts/test_time_compute.py analysis/dispersion_toy_example.yaml  --temperature=1.0 --search_batch_size=1 > logs_ttt/slurm_5_%j.log 2>&1 &
+CUDA_VISIBLE_DEVICES=2 python scripts/test_time_compute.py analysis/dispersion_toy_example.yaml  --temperature=1.2 --search_batch_size=1 > logs_ttt/slurm_6_%j.log 2>&1 &
+CUDA_VISIBLE_DEVICES=3 python scripts/test_time_compute.py analysis/dispersion_toy_example.yaml  --temperature=1.4 --search_batch_size=1 > logs_ttt/slurm_7_%j.log 2>&1 &
 
 # Wait for all background processes to complete
 wait
@@ -76,10 +76,10 @@ echo "================================================"
 
 
 
-CUDA_VISIBLE_DEVICES=0 python scripts/test_time_compute.py analysis/dispersion_toy_example.yaml --approach=best_of_n_tmp_1.6 --temperature=1.6 --search_batch_size=1 > logs_ttt/slurm_8_%j.log 2>&1 &
-CUDA_VISIBLE_DEVICES=1 python scripts/test_time_compute.py analysis/dispersion_toy_example.yaml --approach=best_of_n_tmp_1.8 --temperature=1.8 --search_batch_size=1 > logs_ttt/slurm_9_%j.log 2>&1 &
-CUDA_VISIBLE_DEVICES=2 python scripts/test_time_compute.py analysis/dispersion_toy_example.yaml --approach=best_of_n_tmp_2.0 --temperature=2.0 --search_batch_size=1 > logs_ttt/slurm_10_%j.log 2>&1 &
-CUDA_VISIBLE_DEVICES=3 python scripts/test_time_compute.py analysis/dispersion_toy_example.yaml --approach=best_of_n_tmp_2.2 --temperature=2.2 --search_batch_size=1 > logs_ttt/slurm_11_%j.log 2>&1 &
+CUDA_VISIBLE_DEVICES=0 python scripts/test_time_compute.py analysis/dispersion_toy_example.yaml  --temperature=1.6 --search_batch_size=1 > logs_ttt/slurm_8_%j.log 2>&1 &
+CUDA_VISIBLE_DEVICES=1 python scripts/test_time_compute.py analysis/dispersion_toy_example.yaml  --temperature=1.8 --search_batch_size=1 > logs_ttt/slurm_9_%j.log 2>&1 &
+CUDA_VISIBLE_DEVICES=2 python scripts/test_time_compute.py analysis/dispersion_toy_example.yaml  --temperature=2.0 --search_batch_size=1 > logs_ttt/slurm_10_%j.log 2>&1 &
+CUDA_VISIBLE_DEVICES=3 python scripts/test_time_compute.py analysis/dispersion_toy_example.yaml  --temperature=2.2 --search_batch_size=1 > logs_ttt/slurm_11_%j.log 2>&1 &
 
 
 # Wait for all background processes to complete
