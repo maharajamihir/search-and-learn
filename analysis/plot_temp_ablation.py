@@ -20,9 +20,9 @@ def plot_combined_pass_at_n(json_file_path: Path):
         temperatures.append(temperature)
 
         # Extract pass_at_* values
-        pass_at_n_values.append(value["64"]["pass_at_n"])
-        pass_at_n_clipped_values.append(value["64"]["pass_at_n_clipped"])
-        pass_at_n_constant_values.append(value["64"]["pass_at_n_constant"])
+        pass_at_n_values.append(value["4"]["pass_at_n"])
+        pass_at_n_clipped_values.append(value["4"]["pass_at_n_clipped"])
+        pass_at_n_constant_values.append(value["4"]["pass_at_n_constant"])
 
     # Sort data by temperature
     sorted_indices = sorted(range(len(temperatures)), key=lambda i: temperatures[i])
@@ -33,19 +33,19 @@ def plot_combined_pass_at_n(json_file_path: Path):
 
     # Plot all pass_at_* values in one plot
     plt.figure(figsize=(10, 6))
-    plt.plot(temperatures, pass_at_n_values, marker='o', label='Pass@N')
-    plt.plot(temperatures, pass_at_n_clipped_values, marker='o', label='Pass@N Clipped')
-    plt.plot(temperatures, pass_at_n_constant_values, marker='o', label='Pass@N Constant')
-    plt.title('Pass@N Metrics vs Temperature')
+    plt.plot(temperatures, pass_at_n_values, marker='o', label='pass@4')
+    # plt.plot(temperatures, pass_at_n_clipped_values, marker='o', label='Pass@N Clipped')
+    # plt.plot(temperatures, pass_at_n_constant_values, marker='o', label='Pass@N Constant')
+    plt.title('Impact of temperature on difficulty estimation quality')
     plt.xlabel('Temperature')
-    plt.ylabel('Pass@N Metrics')
+    plt.ylabel('pass@4')
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
-    plt.savefig(json_file_path.parent / 'combined_pass_at_n_vs_temperature_64.png')
+    plt.savefig(json_file_path.parent / 'impact_of_temperature_on_difficulty_estimation_quality.png')
     plt.close()
 
 # Specify the path to your JSON file
-json_file_path = Path('data/meta-llama/Llama-3.2-1B-Instruct/best_of_n_completions_temperature_ablation/pass_at_n_temp_ablation_64.json')
+json_file_path = Path('data/meta-llama/Llama-3.2-1B-Instruct/best_of_n_completions_temperature_ablation/pass_at_n_temp_ablation_4.json')
 print(json_file_path)
 plot_combined_pass_at_n(json_file_path)
