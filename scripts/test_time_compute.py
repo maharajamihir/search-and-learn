@@ -74,6 +74,7 @@ def main():
         desc="Running search",
         load_from_cache_file=False,
     )
+
     if config.approach != "estimate_difficulty":
         dataset = score(dataset, config)
 

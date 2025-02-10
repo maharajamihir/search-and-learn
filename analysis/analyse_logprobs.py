@@ -1539,9 +1539,11 @@ def analyse_attentional_coeff(file_path: str, num_tokens_to_analyse: int) -> Lis
 
     with open(file_path, 'r') as file:
         for line in tqdm(file):
+            breakpoint()
             data = json.loads(line)
             log_probs = data.get('log_probs', [])
             attentions = data.get('attentions', [])
+            breakpoint()
             attn_entropies = _compute_attention_entropy(attentions)
             min_entropies = _compute_attention_min_entropy(attentions)
             pass_at_1 = 0.
