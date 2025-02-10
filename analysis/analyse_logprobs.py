@@ -1061,6 +1061,7 @@ def plot_adaptive_pass_at_n(results: List[Dict[str, Any]], output_dir: Path):
     accuracy_difficulties_clipped = []
     accuracy_prm_score = []
     accuracy_constant = []
+    accuracy_pass_at_1 = []
 
     for mu in budgets:
         difficulties = np.array([r['difficulty'] for r in results])
@@ -1072,10 +1073,14 @@ def plot_adaptive_pass_at_n(results: List[Dict[str, Any]], output_dir: Path):
         agg_scores_last_mean = np.array([1-r['agg_scores_last_mean'] for r in results])
         n_agg_scores_last_mean = (agg_scores_last_mean/np.mean(agg_scores_last_mean)) * mu
 
+        pass_at_1_ratios = np.array([1-r['pass@1'] for r in results])
+        n_pass_at_1_ratios = (pass_at_1_ratios/np.mean(pass_at_1_ratios)) * mu
+
         num_correct_difficulties = 0
         num_correct_difficulties_clipped = 0
         num_correct_prm_scores = 0
         num_correct_constant = 0
+        num_correct_pass_at_1 = 0
 
         for idx, problem in enumerate(results):
             answer_candidates = _extract_solution_from_string(problem["completions"])
@@ -1093,23 +1098,27 @@ def plot_adaptive_pass_at_n(results: List[Dict[str, Any]], output_dir: Path):
             if gt_answer in answer_candidates[:mu]:
                 num_correct_constant += 1
 
+            if gt_answer in answer_candidates[:int(n_pass_at_1_ratios[idx])]:
+                num_correct_pass_at_1 += 1
+
         accuracy_difficulties.append(num_correct_difficulties)
         accuracy_difficulties_clipped.append(num_correct_difficulties_clipped)
         accuracy_prm_score.append(num_correct_prm_scores)
         accuracy_constant.append(num_correct_constant)
+        accuracy_pass_at_1.append(num_correct_pass_at_1)
 
-    
     # plot budget against all accuracies (accuracies are lines). budget is x axis.
     plt.figure(figsize=(10, 6))
-    plt.plot(budgets, accuracy_difficulties, label='Suprise based difficulty', marker='o')
-    plt.plot(budgets, accuracy_difficulties_clipped, label='Surprise based difficulty (clipped)', marker='o')
-    plt.plot(budgets, accuracy_prm_score, label='PRM Score based difficulty', marker='o')
-    plt.plot(budgets, accuracy_constant, label='Constant difficulty', marker='o')
+    plt.plot(budgets, accuracy_difficulties, label='Entropy based difficulty', marker='o')
+    plt.plot(budgets, accuracy_difficulties_clipped, label='Thresholded entropy based difficulty', marker='o')
+    plt.plot(budgets, accuracy_prm_score, label='Empirical difficulty (PRM)', marker='o')
+    plt.plot(budgets, accuracy_constant, label='Uniform difficulty', marker='o')
+    # plt.plot(budgets, accuracy_pass_at_1, label='Pass@1-based', marker='o')
 
-    plt.title('Adaptive pass@n vs mean budget')
-    plt.xlabel('Budget (mean number of generations)')
-    plt.ylabel('Number of Correct Answers')
-    plt.legend(loc='upper left')
+    plt.title('Adaptive pass@n', fontsize=20)
+    plt.xlabel('Budget (mean number of generations)', fontsize=18)
+    plt.ylabel('Number of Correct Answers', fontsize=18)
+    plt.legend(loc='lower right', fontsize=12)
     plt.grid(True)
     plt.tight_layout()
     plt.savefig(output_dir / 'pass_at_n_accuracy_vs_budget.png')
@@ -1122,6 +1131,7 @@ def plot_adaptive_maj_at_n(results: List[Dict[str, Any]], output_dir: Path):
     accuracy_difficulties_clipped = []
     accuracy_prm_score = []
     accuracy_constant = []
+    accuracy_pass_at_1 = []
 
     for mu in budgets:
         difficulties = np.array([r['difficulty'] for r in results])
@@ -1133,10 +1143,14 @@ def plot_adaptive_maj_at_n(results: List[Dict[str, Any]], output_dir: Path):
         agg_scores_last_mean = np.array([1-r['agg_scores_last_mean'] for r in results])
         n_agg_scores_last_mean = (agg_scores_last_mean/np.mean(agg_scores_last_mean)) * mu
 
+        pass_at_1_ratios = np.array([1-r['pass@1'] for r in results])
+        n_pass_at_1_ratios = (pass_at_1_ratios/np.mean(pass_at_1_ratios)) * mu
+
         num_correct_difficulties = 0
         num_correct_difficulties_clipped = 0
         num_correct_prm_scores = 0
         num_correct_constant = 0
+        num_correct_pass_at_1 = 0
 
         for idx, problem in enumerate(results):
             answer_candidates = _extract_solution_from_string(problem["completions"])
@@ -1157,6 +1171,11 @@ def plot_adaptive_maj_at_n(results: List[Dict[str, Any]], output_dir: Path):
                 if majority_vote_prm_scores == gt_answer:
                     num_correct_prm_scores += 1
 
+            if answer_candidates[:int(n_pass_at_1_ratios[idx])]:
+                majority_vote_pass_at_1_scores = max(set(answer_candidates[:int(n_pass_at_1_ratios[idx])]), key=answer_candidates[:int(n_pass_at_1_ratios[idx])].count)
+                if majority_vote_pass_at_1_scores == gt_answer:
+                    num_correct_pass_at_1 += 1
+
             if answer_candidates[:mu]:
                 majority_vote_constant = max(set(answer_candidates[:mu]), key=answer_candidates[:mu].count)
                 if majority_vote_constant == gt_answer:
@@ -1166,19 +1185,21 @@ def plot_adaptive_maj_at_n(results: List[Dict[str, Any]], output_dir: Path):
         accuracy_difficulties_clipped.append(num_correct_difficulties_clipped)
         accuracy_prm_score.append(num_correct_prm_scores)
         accuracy_constant.append(num_correct_constant)
+        accuracy_pass_at_1.append(num_correct_pass_at_1)
 
     
     # plot budget against all accuracies (accuracies are lines). budget is x axis.
     plt.figure(figsize=(10, 6))
-    plt.plot(budgets, accuracy_difficulties, label='Suprise based difficulty', marker='o')
-    plt.plot(budgets, accuracy_difficulties_clipped, label='Surprise based difficulty (clipped)', marker='o')
-    plt.plot(budgets, accuracy_prm_score, label='PRM Score based difficulty', marker='o')
-    plt.plot(budgets, accuracy_constant, label='Constant difficulty', marker='o')
+    plt.plot(budgets, accuracy_difficulties, label='Entropy based difficulty', marker='o')
+    plt.plot(budgets, accuracy_difficulties_clipped, label='Thresholded entropy based difficulty', marker='o')
+    plt.plot(budgets, accuracy_prm_score, label='Empirical difficulty (PRM)', marker='o')
+    plt.plot(budgets, accuracy_constant, label='Uniform difficulty', marker='o')
+    # plt.plot(budgets, accuracy_pass_at_1, label='Empirical difficulty (pass@1)', marker='o')
 
-    plt.title('Adaptive maj@n vs mean budget')
-    plt.xlabel('Budget (mean number of generations)')
-    plt.ylabel('Number of Correct Answers')
-    plt.legend(loc='upper left')
+    plt.title('Adaptive maj@n', fontsize=20)
+    plt.xlabel('Budget (mean number of generations)', fontsize=18)
+    plt.ylabel('Number of Correct Answers', fontsize=18)
+    plt.legend(loc='lower right', fontsize=12)
     plt.grid(True)
     plt.tight_layout()
     plt.savefig(output_dir / 'maj_at_n_accuracy_vs_budget.png')
@@ -1191,6 +1212,7 @@ def plot_adaptive_best_of_n(results: List[Dict[str, Any]], output_dir: Path):
     accuracy_difficulties_clipped = []
     accuracy_prm_score = []
     accuracy_constant = []
+    accuracy_pass_at_1 = []
 
     for mu in budgets:
         difficulties = np.array([r['difficulty'] for r in results])
@@ -1202,12 +1224,15 @@ def plot_adaptive_best_of_n(results: List[Dict[str, Any]], output_dir: Path):
         agg_scores_last_mean = np.array([1-r['agg_scores_last_mean'] for r in results])
         n_agg_scores_last_mean = (agg_scores_last_mean/np.mean(agg_scores_last_mean)) * mu
 
-        #scores = [[gen[0] for gen in r['scores']] for r in results]
+        pass_at_1_ratios = np.array([r['pass@1'] for r in results])
+        n_pass_at_1_ratios = (pass_at_1_ratios/np.mean(pass_at_1_ratios)) * mu
 
+        scores = np.array([r['agg_scores_last'] for r in results])
         num_correct_difficulties = 0
         num_correct_difficulties_clipped = 0
         num_correct_prm_scores = 0
         num_correct_constant = 0
+        num_correct_pass_at_1 = 0
 
         for idx, problem in enumerate(results):
             answer_candidates = _extract_solution_from_string(problem["completions"])
@@ -1228,6 +1253,11 @@ def plot_adaptive_best_of_n(results: List[Dict[str, Any]], output_dir: Path):
                 if answer_candidates[highest_score_idx_prm] == gt_answer:
                     num_correct_prm_scores += 1
 
+            if answer_candidates[:int(n_pass_at_1_ratios[idx])]:
+                highest_score_idx_pass_at_1 = np.argmax(scores[idx][:int(n_pass_at_1_ratios[idx])])
+                if answer_candidates[highest_score_idx_pass_at_1] == gt_answer:
+                    num_correct_pass_at_1 += 1
+
             if answer_candidates[:mu]:
                 highest_score_idx_constant = np.argmax(scores[idx][:mu])
                 if answer_candidates[highest_score_idx_constant] == gt_answer:
@@ -1237,23 +1267,26 @@ def plot_adaptive_best_of_n(results: List[Dict[str, Any]], output_dir: Path):
         accuracy_difficulties_clipped.append(num_correct_difficulties_clipped)
         accuracy_prm_score.append(num_correct_prm_scores)
         accuracy_constant.append(num_correct_constant)
+        accuracy_pass_at_1.append(num_correct_pass_at_1)
 
     
     # plot budget against all accuracies (accuracies are lines). budget is x axis.
     plt.figure(figsize=(10, 6))
-    plt.plot(budgets, accuracy_difficulties, label='Suprise based difficulty', marker='o')
-    plt.plot(budgets, accuracy_difficulties_clipped, label='Surprise based difficulty (clipped)', marker='o')
-    plt.plot(budgets, accuracy_prm_score, label='PRM Score based difficulty', marker='o')
-    plt.plot(budgets, accuracy_constant, label='Constant difficulty', marker='o')
+    plt.plot(budgets, accuracy_difficulties, label='Entropy based difficulty', marker='o')
+    plt.plot(budgets, accuracy_difficulties_clipped, label='Thresholded entropy based difficulty', marker='o')
+    plt.plot(budgets, accuracy_prm_score, label='Empirical difficulty (PRM)', marker='o')
+    plt.plot(budgets, accuracy_constant, label='Uniform difficulty', marker='o')
+    # plt.plot(budgets, accuracy_pass_at_1, label='Empirical difficulty (pass@1)', marker='o')
 
-    plt.title('Adaptive best-of-n vs mean budget')
-    plt.xlabel('Budget (mean number of generations)')
-    plt.ylabel('Number of Correct Answers')
-    plt.legend(loc='upper left')
+    plt.title('Adaptive best-of-n', fontsize=20) 
+    plt.xlabel('Budget (mean number of generations)', fontsize=18)
+    plt.ylabel('Number of Correct Answers', fontsize=18)
+    plt.legend(loc='lower left', fontsize=12)
     plt.grid(True)
     plt.tight_layout()
     plt.savefig(output_dir / 'best_of_n_accuracy_vs_budget.png')
     plt.close()
+
 
 #############################################################################################################################
 
@@ -1629,7 +1662,7 @@ def analyze_logprobs(file_path: str, num_tokens_to_analyse: int) -> List[Dict[st
                 num_correct = sum([1 if str(data["answer"]) in compl else 0 for compl in data["completions"]])
                 pass_at_1 = num_correct/len(data["completions"])
 
-            estimation_entropies = entropies[:4]            
+            estimation_entropies = entropies[:8]            
             difficulty = np.std([item for sublist in estimation_entropies for item in sublist])
             difficulty_clipped = 0 if difficulty > 0.8 else difficulty
 
