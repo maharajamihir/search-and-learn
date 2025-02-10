@@ -1320,17 +1320,56 @@ def k_ablation(results: List[Dict[str, Any]], output_dir: Path):
 
         num_correct_difficulties_per_k.append(num_correct_difficulties)
     
+    plt.figure(figsize=(10, 6))
     plt.plot(range(1, 128, 8), num_correct_difficulties_per_k)
-    plt.title("Impact of number of generations (k) on difficulty estimation quality")
-    plt.xlabel("Number of generations (k)")
-    plt.ylabel("pass@4")
+    plt.title("Impact of number of generations (k) on difficulty estimation quality", fontsize=19)  # Increased font size
+    plt.xlabel("Number of generations (k)", fontsize=18)  # Increased font size
+    plt.ylabel("pass@4", fontsize=18)  # Increased font size
     # plt.xscale('log', base=2)  # Set x-axis to log scale with base 2
+    plt.legend(fontsize=17)
     plt.grid(True)
     plt.tight_layout()
     plt.savefig(output_dir / "num_correct_difficulties_vs_k.png")
     plt.close()
 
+def model_size_ablation(results: List[Dict[str, Any]], output_dir: Path):
 
+    k = 8
+
+    difficulties = [np.std([item for sublist in r['entropies'][:k] for item in sublist]) for r in results]
+
+    n_difficulties = (difficulties/np.mean(difficulties)) * 4
+    num_correct_difficulties = 0
+
+    for idx, problem in enumerate(results):
+        answer_candidates = _extract_solution_from_string(problem["completions"])
+        gt_answer = problem['answer']
+
+        if gt_answer in answer_candidates[:int(n_difficulties[idx])]:
+            num_correct_difficulties += 1
+
+
+
+
+    mean_difficulty = np.mean([np.std([item for sublist in r['entropies'][:k] for item in sublist]) for r in results])
+    n_mean_difficulty = (mean_difficulty/np.mean(mean_difficulty)) * 4
+    print(f"mean_difficulty: {mean_difficulty}")
+
+    num_correct_mean_difficulty = 0
+
+    for idx, problem in enumerate(results):
+        answer_candidates = _extract_solution_from_string(problem["completions"])
+        gt_answer = problem['answer']
+
+        if gt_answer in answer_candidates[:int(n_mean_difficulty)]:
+            num_correct_mean_difficulty += 1
+
+    print(f"pass@4 mean_difficulty: {num_correct_mean_difficulty}")
+
+    # save to json in parent directory
+    with open(output_dir.parent / f"model_size_ablation_{output_dir.parent.name}.json", "w") as f:
+        json.dump({"pass_at_4_ours": num_correct_difficulties, "pass_at_4_mean_difficulty": num_correct_mean_difficulty}, f)
+    
 
 def plot_per_head_per_layer_entropies_scatter(results: List[Dict[str, Any]], output_dir: Path):
     """
@@ -1554,7 +1593,7 @@ def create_plots(results: List[Dict[str, Any]], output_dir: Path):
         # ("plot_adaptive_maj_at_n", plot_adaptive_maj_at_n),
         # ("plot_adaptive_best_of_n", plot_adaptive_best_of_n)
         ("plot_k_ablation", k_ablation)
-
+        # ("plot_model_size_ablation", model_size_ablation)
     ]
 
 
