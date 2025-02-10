@@ -50,7 +50,8 @@ def adaptive_best_of_n(x, config: Config, llm: LLM, prm: PRM):
         convs, tokenize=False, add_generation_prompt=True
     )
 
-    n_generations = x["n"]
+    # n_generations = x["n"]
+    n_generations = config.n
     if type(n_generations) == list and type(n_generations[0]) == int:
         n_generations = n_generations[0]
     

@@ -61,7 +61,6 @@ def best_of_n(x, config: Config, llm: LLM, prm: PRM):
         sampling_params=sampling_params,
         use_tqdm=False,
     )
-
     if len(responses) != len(x["problem"]) * config.n:
         raise ValueError(
             f"Generated {len(responses)} responses instead of {len(x['problem'] * config.n)}"

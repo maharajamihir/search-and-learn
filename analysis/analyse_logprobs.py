@@ -9,6 +9,7 @@ import torch
 import torch.nn.functional as F
 import re
 import random
+from scipy.stats import pearsonr, spearmanr
 
 from sal.utils.score import aggregate_scores
 
@@ -1287,6 +1288,83 @@ def plot_adaptive_best_of_n(results: List[Dict[str, Any]], output_dir: Path):
     plt.savefig(output_dir / 'best_of_n_accuracy_vs_budget.png')
     plt.close()
 
+def check_correlation_difficulty(results: List[Dict[str, Any]], output_dir: Path) -> None:
+    """
+    Check if difficulty correlates with pass@1 ratio using the Pearson and Spearman correlation coefficients
+    and plot them against each other.
+
+    :param results: A list of dictionaries containing analysis data, including difficulties and pass@1 ratios.
+    :param output_dir: Directory to save the plot.
+    """
+    difficulties = [r["difficulty"] for r in results]
+    pass_at_1_ratios = [1 - r["pass@1"] for r in results]
+
+    # Calculate Pearson correlation coefficient and p-value
+    pearson_corr, pearson_p_value = pearsonr(difficulties, pass_at_1_ratios)
+
+    # Calculate Spearman correlation coefficient and p-value
+    spearman_corr, spearman_p_value = spearmanr(difficulties, pass_at_1_ratios)
+
+    # Plot difficulties vs pass@1 ratios
+    plt.figure(figsize=(10, 6))
+    plt.scatter(difficulties, pass_at_1_ratios, alpha=0.7, color='blue')
+    plt.title('Difficulty vs Pass@1 Ratios')
+    plt.xlabel('Difficulty')
+    plt.ylabel('1 - Pass@1 Ratio')
+    plt.grid(True)
+
+    # Add Pearson and Spearman correlation coefficients and p-values to the plot
+    plt.text(0.8, 0.3, f"Pearson r: {pearson_corr:.4f}\nPearson P-value: {pearson_p_value:.4f}\n"
+                       f"Spearman r: {spearman_corr:.4f}\nSpearman P-value: {spearman_p_value:.4f}",
+             transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
+
+    plt.tight_layout()
+    plt.savefig(output_dir / 'difficulty_vs_pass_at_1_correlation.png')
+    plt.close()
+
+    print(f"Pearson correlation coefficient: {pearson_corr:.4f}")
+    print(f"Pearson P-value: {pearson_p_value:.20f}")
+    print(f"Spearman correlation coefficient: {spearman_corr:.4f}")
+    print(f"Spearman P-value: {spearman_p_value:.20f}")
+
+def check_correlation_agg_scores(results: List[Dict[str, Any]], output_dir: Path) -> None:
+    """
+    Check if agg_scores_last_mean correlates with pass@1 ratio using the Pearson and Spearman correlation coefficients
+    and plot them against each other.
+
+    :param results: A list of dictionaries containing analysis data, including agg_scores_last_mean and pass@1 ratios.
+    :param output_dir: Directory to save the plot.
+    """
+    agg_scores_last_mean = [1- r["agg_scores_last_mean"] for r in results]
+    pass_at_1_ratios = [1 - r["pass@1"] for r in results]
+
+    # Calculate Pearson correlation coefficient and p-value
+    pearson_corr, pearson_p_value = pearsonr(agg_scores_last_mean, pass_at_1_ratios)
+
+    # Calculate Spearman correlation coefficient and p-value
+    spearman_corr, spearman_p_value = spearmanr(agg_scores_last_mean, pass_at_1_ratios)
+
+    # Plot agg_scores_last_mean vs pass@1 ratios
+    plt.figure(figsize=(10, 6))
+    plt.scatter(agg_scores_last_mean, pass_at_1_ratios, alpha=0.7, color='green')
+    plt.title('Agg Scores Last Mean vs Pass@1 Ratios')
+    plt.xlabel('Agg Scores Last Mean')
+    plt.ylabel('1 - Pass@1 Ratio')
+    plt.grid(True)
+
+    # Add Pearson and Spearman correlation coefficients and p-values to the plot
+    plt.text(0.8, 0.3, f"Pearson r: {pearson_corr:.4f}\nPearson P-value: {pearson_p_value:.4f}\n"
+                       f"Spearman r: {spearman_corr:.4f}\nSpearman P-value: {spearman_p_value:.4f}",
+             transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
+
+    plt.tight_layout()
+    plt.savefig(output_dir / 'agg_scores_last_mean_vs_pass_at_1_correlation.png')
+    plt.close()
+
+    print(f"Pearson correlation coefficient: {pearson_corr:.4f}")
+    print(f"Pearson P-value: {pearson_p_value:.20f}")
+    print(f"Spearman correlation coefficient: {spearman_corr:.4f}")
+    print(f"Spearman P-value: {spearman_p_value:.20f}")
 
 #############################################################################################################################
 
@@ -1512,9 +1590,9 @@ def create_plots(results: List[Dict[str, Any]], output_dir: Path):
         # ("plot_per_head_per_layer_min_entropies_scatter", plot_per_head_per_layer_min_entropies_scatter),
         # ("plot_per_head_per_layer_min_entropies_scatter_pass_at_1", plot_per_head_per_layer_min_entropies_scatter_pass_at_1),
         # ("plot_stddentropy_vs_pass_at_1", plot_stddentropy_vs_pass_at_1),
-        ("plot_adaptive_pass_at_n", plot_adaptive_pass_at_n),
-        ("plot_adaptive_maj_at_n", plot_adaptive_maj_at_n),
-        ("plot_adaptive_best_of_n", plot_adaptive_best_of_n)
+        # ("plot_adaptive_pass_at_n", plot_adaptive_pass_at_n),
+        # ("plot_adaptive_maj_at_n", plot_adaptive_maj_at_n),
+        # ("plot_adaptive_best_of_n", plot_adaptive_best_of_n)
 
     ]
 
@@ -1523,6 +1601,9 @@ def create_plots(results: List[Dict[str, Any]], output_dir: Path):
     for name, func in tqdm(plot_functions, desc="Generating plots"):
         # print(f"Calling {name}...")
         func(results, output_dir)
+    
+    check_correlation_difficulty(results, output_dir)
+    check_correlation_agg_scores(results, output_dir)
     # print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.2")
     # plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.2)
     # print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.1")
