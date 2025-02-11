@@ -69,7 +69,7 @@ def save_dataset(dataset, config):
         logger.info(f"Pushed dataset to {url}")
     else:
         if config.output_dir is None:
-            config.output_dir = f"data/{config.model_path}"
+            config.output_dir = f"data/{config.model_path}/{config.dataset_name}"
         Path(config.output_dir).mkdir(parents=True, exist_ok=True)
         output_file = Path(f"{config.output_dir}/{config.approach}_completions.jsonl")
         counter = 1
