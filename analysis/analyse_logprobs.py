@@ -9,9 +9,13 @@ import torch
 import torch.nn.functional as F
 import re
 import random
+import signal
+from latex2sympy2 import latex2sympy
+from sympy import latex, simplify
 from scipy.stats import pearsonr, spearmanr
 
 from sal.utils.score import aggregate_scores
+from sal.utils.qwen_math_parser import strip_string
 
 ##########################################################################################################################
 
@@ -52,7 +56,6 @@ def plot_entropy_vs_pass_at_1(results: List[Dict[str, Any]], output_dir: Path):
     plt.savefig(output_dir / 'pass_at_1_vs_entropy.png')
     plt.close()
 
-
 def plot_stddentropy_vs_pass_at_1(results: List[Dict[str, Any]], output_dir: Path):
     # Calculate standard deviation and mean of entropy for each result    
     stddentropies = [np.std([item for sublist in r['entropies'] for item in sublist]) for r in results]
@@ -75,8 +78,6 @@ def plot_stddentropy_vs_pass_at_1(results: List[Dict[str, Any]], output_dir: Pat
     plt.tight_layout()
     plt.savefig(output_dir / 'pass_at_1_vs_stddentropy.png')
     plt.close()
-
-
 
 def plot_varentropy_vs_pass_at_1(results: List[Dict[str, Any]], output_dir: Path):
     # Calculate variance of entropy for each result    
@@ -298,15 +299,9 @@ def plot_logprobs_vs_mean_score(results: List[Dict[str, Any]], output_dir: Path)
     plt.close()
 
 def plot_difficulty_scalar(results: List[Dict[str, Any]], output_dir: Path, percentile: float = 0.01):
-    # Calculate variance and mean of entropy for each result    
-    varentropies = [np.var([item for sublist in r['entropies'] for item in sublist]) for r in results]
-    mean_entropies = [np.mean([item for sublist in r['entropies'] for item in sublist]) for r in results]
-    varentropies = np.array(varentropies)
-    mean_entropies = np.array(mean_entropies)
-
-    difficulties = np.sqrt(varentropies**2 + mean_entropies**2)
-
-    pass_at_1 = [r['pass@1'] for r in results if r['pass@1'] is not None]
+    difficulties = np.array([r['difficulty'] for r in results])
+    difficulties = difficulties
+    pass_at_1 = [r['pass@1'] for r in results]
     
     plt.figure(figsize=(12, 6))
     plt.scatter(pass_at_1, difficulties, alpha=0.7, color='black')
@@ -1045,12 +1040,46 @@ def plot_lowest_cutoff_logprobs_vs_pass_at_1(results: List[Dict[str, Any]], outp
     plt.savefig(output_dir / f'pass_at_1_vs_below_cutoff_{cutoff_value}.png')
     plt.close()
 
+# Timeout exception
+class TimeoutException(Exception):
+    pass
+
+def timeout_handler(signum, frame):
+    raise TimeoutException
+
 def _extract_solution_from_string(strings):
     solutions = []
     for s in strings:
-        match = re.search(r'\d+', s)
+        steps = s.split("\n\n")
+        last_step = steps[-1] if steps else s
+        
+        match = re.search(r'\$\\boxed{(.+?)}\$', last_step)
+        answer = None
+        if not match:
+            match = re.search(r'\d+', last_step)
+        else:
+            answer = match.group()
+            answer = answer.split("$\\boxed{")[-1]
+            answer = answer.split("}$")[0]
+            canonical_form = strip_string(answer)
+            # Set up the timeout handler
+            # signal.signal(signal.SIGALRM, timeout_handler)
+            # signal.alarm(1)
+            # try:
+                # parsed_expr = latex2sympy(answer)
+                # simplified_expr = simplify(parsed_expr)
+                # canonical_form = latex(simplified_expr)
+            # except Exception:
+                # canonical_form = strip_string(answer)
+            # finally:
+                # # Ensure the alarm is turned off
+                # signal.alarm(0)
+        # match = re.search(r'\d+', s)
         if match:
-            solutions.append(int(match.group()))
+            if answer:
+                solutions.append(canonical_form)
+            else:
+                solutions.append(int(match.group()))
         else:
             solutions.append(-1)
     return solutions
@@ -1060,9 +1089,14 @@ def plot_adaptive_pass_at_n(results: List[Dict[str, Any]], output_dir: Path):
 
     accuracy_difficulties = []
     accuracy_difficulties_clipped = []
-    accuracy_prm_score = []
+    accuracy_prm_score_last = []
+    accuracy_prm_score_prod = []
+    accuracy_prm_score_min = []
     accuracy_constant = []
     accuracy_pass_at_1 = []
+
+    answer_candidates_lst = [problem["answer_candidates"] for problem in results]
+    gt_answer_lst = [problem['answer'] for problem in results]
 
     for mu in budgets:
         difficulties = np.array([r['difficulty'] for r in results])
@@ -1074,51 +1108,69 @@ def plot_adaptive_pass_at_n(results: List[Dict[str, Any]], output_dir: Path):
         agg_scores_last_mean = np.array([1-r['agg_scores_last_mean'] for r in results])
         n_agg_scores_last_mean = (agg_scores_last_mean/np.mean(agg_scores_last_mean)) * mu
 
+        agg_scores_prod_mean = np.array([1-r['agg_scores_prod_mean'] for r in results])
+        n_agg_scores_prod_mean = (agg_scores_prod_mean/np.mean(agg_scores_prod_mean)) * mu
+
+        agg_scores_min_mean = np.array([1-r['agg_scores_min_mean'] for r in results])
+        n_agg_scores_min_mean = (agg_scores_min_mean/np.mean(agg_scores_min_mean)) * mu
+
         pass_at_1_ratios = np.array([1-r['pass@1'] for r in results])
         n_pass_at_1_ratios = (pass_at_1_ratios/np.mean(pass_at_1_ratios)) * mu
 
         num_correct_difficulties = 0
         num_correct_difficulties_clipped = 0
-        num_correct_prm_scores = 0
+        num_correct_prm_scores_last = 0
+        num_correct_prm_scores_prod = 0
+        num_correct_prm_scores_min = 0
         num_correct_constant = 0
         num_correct_pass_at_1 = 0
 
         for idx, problem in enumerate(results):
-            answer_candidates = _extract_solution_from_string(problem["completions"])
-            gt_answer = problem['answer']
+            answer_candidates = answer_candidates_lst[idx]
+            gt_answer = gt_answer_lst[idx]
 
-            if gt_answer in answer_candidates[:int(n_difficulties[idx])]:
+            if gt_answer in answer_candidates[:int(n_difficulties[idx]+0.5)]:
                 num_correct_difficulties += 1
 
-            if gt_answer in answer_candidates[:int(n_difficulties_clipped[idx])]:
+            if gt_answer in answer_candidates[:int(n_difficulties_clipped[idx] + 0.5)]:
                 num_correct_difficulties_clipped += 1
 
-            if gt_answer in answer_candidates[:int(n_agg_scores_last_mean[idx])]:
-                num_correct_prm_scores += 1
+            if gt_answer in answer_candidates[:int(n_agg_scores_last_mean[idx] + 0.5)]:
+                num_correct_prm_scores_last += 1
 
-            if gt_answer in answer_candidates[:mu]:
+            if gt_answer in answer_candidates[:int(n_agg_scores_prod_mean[idx] + 0.5)]:
+                num_correct_prm_scores_prod += 1
+
+            if gt_answer in answer_candidates[:int(n_agg_scores_min_mean[idx] + 0.5)]:
+                num_correct_prm_scores_min += 1
+
+            if gt_answer in answer_candidates[:int(mu)]:
                 num_correct_constant += 1
 
-            if gt_answer in answer_candidates[:int(n_pass_at_1_ratios[idx])]:
+            if gt_answer in answer_candidates[:int(n_pass_at_1_ratios[idx] + 0.5)]:
                 num_correct_pass_at_1 += 1
 
         accuracy_difficulties.append(num_correct_difficulties)
         accuracy_difficulties_clipped.append(num_correct_difficulties_clipped)
-        accuracy_prm_score.append(num_correct_prm_scores)
+        accuracy_prm_score_last.append(num_correct_prm_scores_last)
+        accuracy_prm_score_prod.append(num_correct_prm_scores_prod)
+        accuracy_prm_score_min.append(num_correct_prm_scores_min)
         accuracy_constant.append(num_correct_constant)
         accuracy_pass_at_1.append(num_correct_pass_at_1)
 
     # plot budget against all accuracies (accuracies are lines). budget is x axis.
     plt.figure(figsize=(10, 6))
-    plt.plot(budgets, accuracy_difficulties, label='Entropy based difficulty', marker='o')
-    plt.plot(budgets, accuracy_difficulties_clipped, label='Thresholded entropy based difficulty', marker='o')
-    plt.plot(budgets, accuracy_prm_score, label='Empirical difficulty (PRM)', marker='o')
-    plt.plot(budgets, accuracy_constant, label='Uniform difficulty', marker='o')
-    # plt.plot(budgets, accuracy_pass_at_1, label='Pass@1-based', marker='o')
-
-    plt.title('Adaptive pass@n', fontsize=20)
+    plt.plot(budgets, np.array(accuracy_difficulties)/len(results), label='Entropy based difficulty', marker='o')
+    # plt.plot(budgets, np.array(accuracy_difficulties_clipped)/len(results), label='Thresholded entropy based difficulty', marker='o')
+    plt.plot(budgets, np.array(accuracy_prm_score_last)/len(results), label='Empirical difficulty (PRM) - Last', marker='o')
+    plt.plot(budgets, np.array(accuracy_prm_score_prod)/len(results), label='Empirical difficulty (PRM) - Prod', marker='o')
+    plt.plot(budgets, np.array(accuracy_prm_score_min)/len(results), label='Empirical difficulty (PRM) - Min', marker='o')
+    plt.plot(budgets, np.array(accuracy_constant)/len(results), label='Uniform difficulty', marker='o')
+    plt.plot(budgets, np.array(accuracy_pass_at_1)/len(results), label='Pass@1-based', marker='o')
+    #plt.xscale('log', base=2)
+    plt.title('Adaptive pass@n on MATH', fontsize=20)
     plt.xlabel('Budget (mean number of generations)', fontsize=18)
-    plt.ylabel('Number of Correct Answers', fontsize=18)
+    plt.ylabel('Accuracy', fontsize=18)
     plt.legend(loc='lower right', fontsize=12)
     plt.grid(True)
     plt.tight_layout()
@@ -1130,7 +1182,9 @@ def plot_adaptive_maj_at_n(results: List[Dict[str, Any]], output_dir: Path):
 
     accuracy_difficulties = []
     accuracy_difficulties_clipped = []
-    accuracy_prm_score = []
+    accuracy_prm_score_last = []
+    accuracy_prm_score_prod = []
+    accuracy_prm_score_min = []
     accuracy_constant = []
     accuracy_pass_at_1 = []
 
@@ -1144,58 +1198,79 @@ def plot_adaptive_maj_at_n(results: List[Dict[str, Any]], output_dir: Path):
         agg_scores_last_mean = np.array([1-r['agg_scores_last_mean'] for r in results])
         n_agg_scores_last_mean = (agg_scores_last_mean/np.mean(agg_scores_last_mean)) * mu
 
+        agg_scores_prod_mean = np.array([1-r['agg_scores_prod_mean'] for r in results])
+        n_agg_scores_prod_mean = (agg_scores_prod_mean/np.mean(agg_scores_prod_mean)) * mu
+
+        agg_scores_min_mean = np.array([1-r['agg_scores_min_mean'] for r in results])
+        n_agg_scores_min_mean = (agg_scores_min_mean/np.mean(agg_scores_min_mean)) * mu
+
         pass_at_1_ratios = np.array([1-r['pass@1'] for r in results])
         n_pass_at_1_ratios = (pass_at_1_ratios/np.mean(pass_at_1_ratios)) * mu
 
         num_correct_difficulties = 0
         num_correct_difficulties_clipped = 0
-        num_correct_prm_scores = 0
+        num_correct_prm_scores_last = 0
+        num_correct_prm_scores_prod = 0
+        num_correct_prm_scores_min = 0
         num_correct_constant = 0
         num_correct_pass_at_1 = 0
 
         for idx, problem in enumerate(results):
-            answer_candidates = _extract_solution_from_string(problem["completions"])
+            answer_candidates = problem["answer_candidates"]
             gt_answer = problem['answer']
 
-            if answer_candidates[:int(n_difficulties[idx])]:
-                majority_vote_difficulties = max(set(answer_candidates[:int(n_difficulties[idx])]), key=answer_candidates[:int(n_difficulties[idx])].count)
+            if answer_candidates[:int(n_difficulties[idx] + 0.5)]:
+                majority_vote_difficulties = max(set(answer_candidates[:int(n_difficulties[idx] + 0.5)]), key=answer_candidates[:int(n_difficulties[idx] + 0.5)].count)
                 if majority_vote_difficulties == gt_answer:
                     num_correct_difficulties += 1
 
-            if answer_candidates[:int(n_difficulties_clipped[idx])]:
-                majority_vote_difficulties_clipped = max(set(answer_candidates[:int(n_difficulties_clipped[idx])]), key=answer_candidates[:int(n_difficulties_clipped[idx])].count)
+            if answer_candidates[:int(n_difficulties_clipped[idx] + 0.5)]:
+                majority_vote_difficulties_clipped = max(set(answer_candidates[:int(n_difficulties_clipped[idx] + 0.5)]), key=answer_candidates[:int(n_difficulties_clipped[idx] + 0.5)].count)
                 if majority_vote_difficulties_clipped == gt_answer:
                     num_correct_difficulties_clipped += 1
 
-            if answer_candidates[:int(n_agg_scores_last_mean[idx])]:
-                majority_vote_prm_scores = max(set(answer_candidates[:int(n_agg_scores_last_mean[idx])]), key=answer_candidates[:int(n_agg_scores_last_mean[idx])].count)
-                if majority_vote_prm_scores == gt_answer:
-                    num_correct_prm_scores += 1
+            if answer_candidates[:int(n_agg_scores_last_mean[idx] + 0.5)]:
+                majority_vote_prm_scores_last = max(set(answer_candidates[:int(n_agg_scores_last_mean[idx] + 0.5)]), key=answer_candidates[:int(n_agg_scores_last_mean[idx] + 0.5)].count)
+                if majority_vote_prm_scores_last == gt_answer:
+                    num_correct_prm_scores_last += 1
 
-            if answer_candidates[:int(n_pass_at_1_ratios[idx])]:
-                majority_vote_pass_at_1_scores = max(set(answer_candidates[:int(n_pass_at_1_ratios[idx])]), key=answer_candidates[:int(n_pass_at_1_ratios[idx])].count)
+            if answer_candidates[:int(n_agg_scores_prod_mean[idx] + 0.5)]:
+                majority_vote_prm_scores_prod = max(set(answer_candidates[:int(n_agg_scores_prod_mean[idx] + 0.5)]), key=answer_candidates[:int(n_agg_scores_prod_mean[idx] + 0.5)].count)
+                if majority_vote_prm_scores_prod == gt_answer:
+                    num_correct_prm_scores_prod += 1
+
+            if answer_candidates[:int(n_agg_scores_min_mean[idx] + 0.5)]:
+                majority_vote_prm_scores_min = max(set(answer_candidates[:int(n_agg_scores_min_mean[idx] + 0.5)]), key=answer_candidates[:int(n_agg_scores_min_mean[idx] + 0.5)].count)
+                if majority_vote_prm_scores_min == gt_answer:
+                    num_correct_prm_scores_min += 1
+
+            if answer_candidates[:int(n_pass_at_1_ratios[idx] + 0.5)]:
+                majority_vote_pass_at_1_scores = max(set(answer_candidates[:int(n_pass_at_1_ratios[idx] + 0.5)]), key=answer_candidates[:int(n_pass_at_1_ratios[idx] + 0.5)].count)
                 if majority_vote_pass_at_1_scores == gt_answer:
                     num_correct_pass_at_1 += 1
 
-            if answer_candidates[:mu]:
-                majority_vote_constant = max(set(answer_candidates[:mu]), key=answer_candidates[:mu].count)
+            if answer_candidates[:int(mu + 0.5)]:
+                majority_vote_constant = max(set(answer_candidates[:int(mu + 0.5)]), key=answer_candidates[:int(mu + 0.5)].count)
                 if majority_vote_constant == gt_answer:
                     num_correct_constant += 1
 
         accuracy_difficulties.append(num_correct_difficulties)
         accuracy_difficulties_clipped.append(num_correct_difficulties_clipped)
-        accuracy_prm_score.append(num_correct_prm_scores)
+        accuracy_prm_score_last.append(num_correct_prm_scores_last)
+        accuracy_prm_score_prod.append(num_correct_prm_scores_prod)
+        accuracy_prm_score_min.append(num_correct_prm_scores_min)
         accuracy_constant.append(num_correct_constant)
         accuracy_pass_at_1.append(num_correct_pass_at_1)
 
-    
     # plot budget against all accuracies (accuracies are lines). budget is x axis.
     plt.figure(figsize=(10, 6))
     plt.plot(budgets, accuracy_difficulties, label='Entropy based difficulty', marker='o')
-    plt.plot(budgets, accuracy_difficulties_clipped, label='Thresholded entropy based difficulty', marker='o')
-    plt.plot(budgets, accuracy_prm_score, label='Empirical difficulty (PRM)', marker='o')
+    # plt.plot(budgets, accuracy_difficulties_clipped, label='Thresholded entropy based difficulty', marker='o')
+    plt.plot(budgets, accuracy_prm_score_last, label='Empirical difficulty (PRM) - Last', marker='o')
+    plt.plot(budgets, accuracy_prm_score_prod, label='Empirical difficulty (PRM) - Prod', marker='o')
+    plt.plot(budgets, accuracy_prm_score_min, label='Empirical difficulty (PRM) - Min', marker='o')
     plt.plot(budgets, accuracy_constant, label='Uniform difficulty', marker='o')
-    # plt.plot(budgets, accuracy_pass_at_1, label='Empirical difficulty (pass@1)', marker='o')
+    plt.plot(budgets, accuracy_pass_at_1, label='Empirical difficulty (pass@1)', marker='o')
 
     plt.title('Adaptive maj@n', fontsize=20)
     plt.xlabel('Budget (mean number of generations)', fontsize=18)
@@ -1211,7 +1286,9 @@ def plot_adaptive_best_of_n(results: List[Dict[str, Any]], output_dir: Path):
 
     accuracy_difficulties = []
     accuracy_difficulties_clipped = []
-    accuracy_prm_score = []
+    accuracy_prm_score_last = []
+    accuracy_prm_score_prod = []
+    accuracy_prm_score_min = []
     accuracy_constant = []
     accuracy_pass_at_1 = []
 
@@ -1225,59 +1302,80 @@ def plot_adaptive_best_of_n(results: List[Dict[str, Any]], output_dir: Path):
         agg_scores_last_mean = np.array([1-r['agg_scores_last_mean'] for r in results])
         n_agg_scores_last_mean = (agg_scores_last_mean/np.mean(agg_scores_last_mean)) * mu
 
+        agg_scores_prod_mean = np.array([1-r['agg_scores_prod_mean'] for r in results])
+        n_agg_scores_prod_mean = (agg_scores_prod_mean/np.mean(agg_scores_prod_mean)) * mu
+
+        agg_scores_min_mean = np.array([1-r['agg_scores_min_mean'] for r in results])
+        n_agg_scores_min_mean = (agg_scores_min_mean/np.mean(agg_scores_min_mean)) * mu
+
         pass_at_1_ratios = np.array([r['pass@1'] for r in results])
         n_pass_at_1_ratios = (pass_at_1_ratios/np.mean(pass_at_1_ratios)) * mu
 
         scores = np.array([r['agg_scores_last'] for r in results])
         num_correct_difficulties = 0
         num_correct_difficulties_clipped = 0
-        num_correct_prm_scores = 0
+        num_correct_prm_scores_last = 0
+        num_correct_prm_scores_prod = 0
+        num_correct_prm_scores_min = 0
         num_correct_constant = 0
         num_correct_pass_at_1 = 0
 
         for idx, problem in enumerate(results):
-            answer_candidates = _extract_solution_from_string(problem["completions"])
+            answer_candidates = problem["answer_candidates"]
             gt_answer = problem['answer']
 
-            if answer_candidates[:int(n_difficulties[idx])]:
-                highest_score_idx = np.argmax(scores[idx][:int(n_difficulties[idx])])
+            if answer_candidates[:int(n_difficulties[idx] + 0.5)]:
+                highest_score_idx = np.argmax(scores[idx][:int(n_difficulties[idx] + 0.5)])
                 if answer_candidates[highest_score_idx] == gt_answer:
                     num_correct_difficulties += 1
 
-            if answer_candidates[:int(n_difficulties_clipped[idx])]:
-                highest_score_idx_clipped = np.argmax(scores[idx][:int(n_difficulties_clipped[idx])])
+            if answer_candidates[:int(n_difficulties_clipped[idx] + 0.5)]:
+                highest_score_idx_clipped = np.argmax(scores[idx][:int(n_difficulties_clipped[idx] + 0.5)])
                 if answer_candidates[highest_score_idx_clipped] == gt_answer:
                     num_correct_difficulties_clipped += 1
 
-            if answer_candidates[:int(n_agg_scores_last_mean[idx])]:
-                highest_score_idx_prm = np.argmax(scores[idx][:int(n_agg_scores_last_mean[idx])])
-                if answer_candidates[highest_score_idx_prm] == gt_answer:
-                    num_correct_prm_scores += 1
+            if answer_candidates[:int(n_agg_scores_last_mean[idx] + 0.5)]:
+                highest_score_idx_prm_last = np.argmax(scores[idx][:int(n_agg_scores_last_mean[idx] + 0.5)])
+                if answer_candidates[highest_score_idx_prm_last] == gt_answer:
+                    num_correct_prm_scores_last += 1
 
-            if answer_candidates[:int(n_pass_at_1_ratios[idx])]:
-                highest_score_idx_pass_at_1 = np.argmax(scores[idx][:int(n_pass_at_1_ratios[idx])])
+            if answer_candidates[:int(n_agg_scores_prod_mean[idx] + 0.5)]:
+                highest_score_idx_prm_prod = np.argmax(scores[idx][:int(n_agg_scores_prod_mean[idx] + 0.5)])
+                if answer_candidates[highest_score_idx_prm_prod] == gt_answer:
+                    num_correct_prm_scores_prod += 1
+
+            if answer_candidates[:int(n_agg_scores_min_mean[idx] + 0.5)]:
+                highest_score_idx_prm_min = np.argmax(scores[idx][:int(n_agg_scores_min_mean[idx] + 0.5)])
+                if answer_candidates[highest_score_idx_prm_min] == gt_answer:
+                    num_correct_prm_scores_min += 1
+
+            if answer_candidates[:int(n_pass_at_1_ratios[idx] + 0.5)]:
+                highest_score_idx_pass_at_1 = np.argmax(scores[idx][:int(n_pass_at_1_ratios[idx] + 0.5)])
                 if answer_candidates[highest_score_idx_pass_at_1] == gt_answer:
                     num_correct_pass_at_1 += 1
 
-            if answer_candidates[:mu]:
-                highest_score_idx_constant = np.argmax(scores[idx][:mu])
+            if answer_candidates[:int(mu + 0.5)]:
+                highest_score_idx_constant = np.argmax(scores[idx][:int(mu + 0.5)])
                 if answer_candidates[highest_score_idx_constant] == gt_answer:
                     num_correct_constant += 1
 
         accuracy_difficulties.append(num_correct_difficulties)
         accuracy_difficulties_clipped.append(num_correct_difficulties_clipped)
-        accuracy_prm_score.append(num_correct_prm_scores)
+        accuracy_prm_score_last.append(num_correct_prm_scores_last)
+        accuracy_prm_score_prod.append(num_correct_prm_scores_prod)
+        accuracy_prm_score_min.append(num_correct_prm_scores_min)
         accuracy_constant.append(num_correct_constant)
         accuracy_pass_at_1.append(num_correct_pass_at_1)
 
-    
     # plot budget against all accuracies (accuracies are lines). budget is x axis.
     plt.figure(figsize=(10, 6))
     plt.plot(budgets, accuracy_difficulties, label='Entropy based difficulty', marker='o')
-    plt.plot(budgets, accuracy_difficulties_clipped, label='Thresholded entropy based difficulty', marker='o')
-    plt.plot(budgets, accuracy_prm_score, label='Empirical difficulty (PRM)', marker='o')
+    # plt.plot(budgets, accuracy_difficulties_clipped, label='Thresholded entropy based difficulty', marker='o')
+    plt.plot(budgets, accuracy_prm_score_last, label='Empirical difficulty (PRM) - Last', marker='o')
+    plt.plot(budgets, accuracy_prm_score_prod, label='Empirical difficulty (PRM) - Prod', marker='o')
+    plt.plot(budgets, accuracy_prm_score_min, label='Empirical difficulty (PRM) - Min', marker='o')
     plt.plot(budgets, accuracy_constant, label='Uniform difficulty', marker='o')
-    # plt.plot(budgets, accuracy_pass_at_1, label='Empirical difficulty (pass@1)', marker='o')
+    plt.plot(budgets, accuracy_pass_at_1, label='Empirical difficulty (pass@1)', marker='o')
 
     plt.title('Adaptive best-of-n', fontsize=20) 
     plt.xlabel('Budget (mean number of generations)', fontsize=18)
@@ -1582,7 +1680,7 @@ def create_plots(results: List[Dict[str, Any]], output_dir: Path):
         # ("plot_per_token_logprobs_for_ith_problem", plot_per_token_logprobs_for_ith_problem),
         # ("plot_lowest_quartile_logprobs_vs_pass_at_1", plot_lowest_quartile_logprobs_vs_pass_at_1),
         # ("plot_lowest_quartile_entropy_vs_pass_at_1", plot_lowest_quartile_entropy_vs_pass_at_1),
-        # ("plot_difficulty_scalar", plot_difficulty_scalar),
+        ("plot_difficulty_scalar", plot_difficulty_scalar),
         # ("plot_varentropy_vs_mean_entropy", plot_varentropy_vs_mean_entropy),
         # ("plot_per_head_per_layer_entropies_scatter", plot_per_head_per_layer_entropies_scatter),
         # ("plot_pass_at_1_vs_list_len_score", plot_pass_at_1_vs_list_len_score),
@@ -1590,9 +1688,10 @@ def create_plots(results: List[Dict[str, Any]], output_dir: Path):
         # ("plot_per_head_per_layer_min_entropies_scatter", plot_per_head_per_layer_min_entropies_scatter),
         # ("plot_per_head_per_layer_min_entropies_scatter_pass_at_1", plot_per_head_per_layer_min_entropies_scatter_pass_at_1),
         # ("plot_stddentropy_vs_pass_at_1", plot_stddentropy_vs_pass_at_1),
-        # ("plot_adaptive_pass_at_n", plot_adaptive_pass_at_n),
-        # ("plot_adaptive_maj_at_n", plot_adaptive_maj_at_n),
-        # ("plot_adaptive_best_of_n", plot_adaptive_best_of_n)
+        ("plot_adaptive_pass_at_n", plot_adaptive_pass_at_n),
+        ("plot_adaptive_maj_at_n", plot_adaptive_maj_at_n),
+        ("plot_adaptive_best_of_n", plot_adaptive_best_of_n),
+        ("check_correlation_difficulty", check_correlation_difficulty)
 
     ]
 
@@ -1602,8 +1701,8 @@ def create_plots(results: List[Dict[str, Any]], output_dir: Path):
         # print(f"Calling {name}...")
         func(results, output_dir)
     
-    check_correlation_difficulty(results, output_dir)
-    check_correlation_agg_scores(results, output_dir)
+    # check_correlation_difficulty(results, output_dir)
+    # check_correlation_agg_scores(results, output_dir)
     # print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.2")
     # plot_lowest_quartile_logprobs_vs_pass_at_1(results, output_dir, 0.2)
     # print("Plotting lowest quartile logprobs vs pass@1 with threshold 0.1")
@@ -1683,14 +1782,37 @@ def create_plots(results: List[Dict[str, Any]], output_dir: Path):
     # plot_lowest_cutoff_logprobs_vs_pass_at_1(results, output_dir, -8)
     # plot_lowest_cutoff_logprobs_vs_pass_at_1(results, output_dir, -9)
 
-def analyze_logprobs(file_path: str, num_tokens_to_analyse: int) -> List[Dict[str, Any]]:
+def analyze_logprobs(file_path: str, num_tokens_to_analyse: int, difficulties_file=None) -> List[Dict[str, Any]]:
     results = []
     
+    # difficulties_file = "data/meta-llama/Llama-3.2-1B-Instruct_bak/best_of_n_completions-15_analysis/analysis.msgpack"
+    # difficulties_file = "data/meta-llama/Llama-3.2-1B-Instruct_bak/best_of_n_completions-16_analysis/analysis.msgpack"
+    # difficulties_file  = "data/meta-llama/Llama-3.2-1B-Instruct/estimate_difficulty_completions_analysis/analysis.msgpack"
+    difficulties_file  = "data/meta-llama/Llama-3.2-1B-Instruct/estimate_difficulty_completions-1_analysis/analysis.msgpack"
+
+    difficulties_data = dict()
+    if difficulties_file is not None:
+        with open(difficulties_file, 'rb') as df:
+            difficulties_data_list = msgpack.unpackb(df.read())
+        for item in difficulties_data_list:
+            problem = item.get('problem')
+            difficulty = item.get('difficulty')
+            if problem is not None and difficulty is not None:
+                difficulties_data[problem] = difficulty
+
+
     with open(file_path, 'r') as f:
         for line in tqdm(f, desc="Processing lines"):
             data = json.loads(line)
             # Skip if no log_probs
             if 'log_probs' not in data:
+                analysis = {
+                    'unique_id': data.get('unique_id', None),
+                    'answer': data.get('answer', None),
+                    'problem': data.get('problem', None),
+                }
+                
+                results.append(analysis)
                 continue
 
             scores = data["scores"]
@@ -1710,19 +1832,19 @@ def analyze_logprobs(file_path: str, num_tokens_to_analyse: int) -> List[Dict[st
             num_generations = len(log_probs)
             
             # Calculate average for each rank position across all generations and tokens
-            avg_by_rank = []
-            stds_by_rank = []
+            #avg_by_rank = []
+            #stds_by_rank = []
 
-            for rank in range(len(log_probs[0][0])):  # For each rank position
-                rank_probs = []
-                for gen in range(num_generations):
-                    for token in range(len(log_probs[gen])):
-                        if rank < len(log_probs[gen][token]):
-                            rank_probs.append(log_probs[gen][token][rank])
-                avg = float(np.mean(rank_probs))
-                std = float(np.std(rank_probs))
-                avg_by_rank.append(avg)
-                stds_by_rank.append(std)
+            # for rank in range(len(log_probs[0][0])):  # For each rank position
+                # rank_probs = []
+                # for gen in range(num_generations):
+                    # for token in range(len(log_probs[gen])):
+                        # if rank < len(log_probs[gen][token]):
+                            # rank_probs.append(log_probs[gen][token][rank])
+                # avg = float(np.mean(rank_probs))
+                # std = float(np.std(rank_probs))
+                # avg_by_rank.append(avg)
+                # stds_by_rank.append(std)
                 
             
             # Calculate entropy for each token in each generation
@@ -1739,33 +1861,42 @@ def analyze_logprobs(file_path: str, num_tokens_to_analyse: int) -> List[Dict[st
                     surprises[gen].append(surprise)
 
             pass_at_1 = data.get("pass@1", None)
-            if "list_length" in data.keys():
-                num_correct = sum([1 if str(data["answer"]) in compl else 0 for compl in data["completions"]])
-                pass_at_1 = num_correct/len(data["completions"])
+            last_lines = [compl.split("\n")[-1] if "\n" in compl else compl for compl in data["completions"]]
+            answer_candidates = _extract_solution_from_string(last_lines)
+            answer_candidates = [str(candidate) for candidate in answer_candidates]
+            num_correct = sum([1 if str(data["answer"]) == ans else 0 for ans in answer_candidates])
+            pass_at_1 = num_correct/len(data["completions"])
+            answer = strip_string(data["answer"])
 
-            estimation_entropies = entropies[:8]            
-            difficulty = np.std([item for sublist in estimation_entropies for item in sublist])
-            difficulty_clipped = 0 if difficulty > 0.8 else difficulty
+            if difficulties_file:
+                difficulty = difficulties_data.get(data.get("problem"), None)
+                difficulty_clipped = 0 if difficulty > 0.8 else difficulty
+                if difficulty is None:
+                    raise ValueError(f"Difficulty not found for problem: {data.get('problem')}")
+            else:
+                estimation_entropies = entropies
+                difficulty = np.std([item for sublist in estimation_entropies for item in sublist])
+                difficulty_clipped = 0 if difficulty > 0.8 else difficulty
 
 
             analysis = {
                 'unique_id': data.get('unique_id', None),
-                'answer': data.get('answer', None),
-                'completions': data.get('completions', []),
+                'answer': answer,
+                # 'completions': data.get('completions', []),
                 'problem': data.get('problem', None),
                 'level': data.get('level', None),
-                'list_length': data.get('seq_len', None),
-                'original_logprobs': log_probs,
-                'max_logprobs_per_token': [max(token_probs) for gen in log_probs for token_probs in gen],
-                'avg_by_rank': avg_by_rank,
-                'stds_by_rank': stds_by_rank,
-                'avg_logprob_per_token': float(np.mean([np.mean(probs) for gen in log_probs for probs in gen])),
-                'entropies': entropies,
-                'surprises': surprises,
+                'list_length': data.get('list_length', None),
+                # 'original_logprobs': log_probs,
+                # 'max_logprobs_per_token': [max(token_probs) for gen in log_probs for token_probs in gen],
+                #'avg_by_rank': avg_by_rank,
+                #'stds_by_rank': stds_by_rank,
+                #'avg_logprob_per_token': float(np.mean([np.mean(probs) for gen in log_probs for probs in gen])),
+                #'entropies': entropies,
+                #'surprises': surprises,
                 'difficulty': difficulty,
                 'difficulty_clipped': difficulty_clipped,
-                #'answer_candidates': answer_candidates,
-                'avg_entropy': float(np.mean([item for sublist in entropies for item in sublist])),
+                'answer_candidates': answer_candidates,
+                # 'avg_entropy': float(np.mean([item for sublist in entropies for item in sublist])),
                 'pass@1': pass_at_1,
                 'mean_score': data.get('mean_score', None),
                 'level_mean': data.get('level_mean', None),
@@ -1814,10 +1945,7 @@ if __name__ == "__main__":
             raise ValueError(f"Invalid number of samples specified: {sys.argv[3]}")
 
     if file_path.endswith('.jsonl'):
-        if Path(file_path).stem.startswith('best_of_n'):
-            results = analyze_logprobs(file_path, num_tokens_to_analyse)
-        else:
-            results = analyse_attentional_coeff(file_path, num_tokens_to_analyse)
+        results = analyze_logprobs(file_path, num_tokens_to_analyse)
         # Create output directory based on input file name
         output_dir = Path(file_path).parent / (Path(file_path).stem + '_analysis')
         # Save results to JSON file

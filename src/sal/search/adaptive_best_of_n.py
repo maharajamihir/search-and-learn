@@ -15,6 +15,7 @@
 
 import numpy as np
 from vllm import LLM, SamplingParams
+import json
 
 from sal.config import Config
 from sal.models.reward_models import PRM
@@ -90,7 +91,13 @@ def adaptive_best_of_n(x, config: Config, llm: LLM, prm: PRM):
         raise ValueError(
             f"Generated {len(responses)} responses instead of {len(x['problem'] * n_generations)}"
         )
+    
+    ## TODO remove
+    import json
 
+    # Save responses to responses.json
+    with open('responses.json', 'w') as f:
+        json.dump([r.to_dict() for r in responses], f, indent=4)
     for i in range(len(completions)):
         completions[i] = [
             output.text
@@ -111,6 +118,7 @@ def adaptive_best_of_n(x, config: Config, llm: LLM, prm: PRM):
                     log_probs_per_token.append(log_prob_values) 
                 log_probs[i].append(log_probs_per_token)
 
+    
     # Check we generated the correct number of completions for each prompt
     for c in completions:
         if len(c) != n_generations:
@@ -128,4 +136,9 @@ def adaptive_best_of_n(x, config: Config, llm: LLM, prm: PRM):
     x["pred"] = pred
     x["completion_tokens"] = completion_tokens
     x["log_probs"] = log_probs
+
+    with open('tmp.json', 'w') as tmp_file:
+        json.dump(x, tmp_file, indent=4)
+
+    exit()
     return x

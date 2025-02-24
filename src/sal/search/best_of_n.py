@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import numpy as np
+import json
 from vllm import LLM, SamplingParams
 
 from sal.config import Config
@@ -23,6 +24,9 @@ from sal.utils.score import aggregate_scores
 
 def best_of_n(x, config: Config, llm: LLM, prm: PRM):
     tokenizer = llm.get_tokenizer()
+    
+    if "question" in x.keys():
+        x["problem"] = x["question"]
 
     convs = [
         [
@@ -103,4 +107,5 @@ def best_of_n(x, config: Config, llm: LLM, prm: PRM):
     x["pred"] = pred
     x["completion_tokens"] = completion_tokens
     x["log_probs"] = log_probs
+
     return x

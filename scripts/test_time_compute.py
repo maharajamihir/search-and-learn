@@ -17,6 +17,7 @@ import logging
 
 import torch
 from vllm import LLM
+from pathlib import Path
 
 from sal.config import Config
 from sal.models.reward_models import load_prm
@@ -35,7 +36,7 @@ APPROACHES = {
     "beam_search": beam_search,
     "dvts": dvts,
     "best_of_n": best_of_n,
-    "estimate_difficulty": estimate_difficulty,
+    "estimate_difficulty": adaptive_best_of_n,
     "adaptive_best_of_n": adaptive_best_of_n
 }
 
@@ -52,32 +53,53 @@ def main():
         dataset = load_adaptive_best_of_n_dataset(config.dataset_name, config.n)
     else:
         dataset = get_dataset(config)
+    # dataset = get_dataset(config)
 
-    if config.approach != "estimate_difficulty":
-        llm = LLM(
-            model=config.model_path,
-            gpu_memory_utilization=config.gpu_memory_utilization,
-            enable_prefix_caching=True,
-            seed=config.seed,
-            tensor_parallel_size=num_gpus,
-        )
-        prm = load_prm(config)
-    else: 
-        llm = None
-        prm = None
-
-    dataset = dataset.map(
-        approach_fn,
-        batched=True,
-        batch_size=config.search_batch_size,
-        fn_kwargs={"config": config, "llm": llm, "prm": prm},
-        desc="Running search",
-        load_from_cache_file=False,
+    llm = LLM(
+        model=config.model_path,
+        gpu_memory_utilization=config.gpu_memory_utilization,
+        enable_prefix_caching=True,
+        seed=config.seed,
+        tensor_parallel_size=num_gpus,
     )
-    if config.approach != "estimate_difficulty":
-        dataset = score(dataset, config)
+    prm = load_prm(config)
+    
+    if config.approach == "estimate_difficulty":
+        dataset = dataset.map(
+            approach_fn,
+            batched=True,
+            batch_size=config.search_batch_size,
+            fn_kwargs={"config": config, "llm": llm, "prm": prm},
+            desc="Running search",
+            load_from_cache_file=False,
+        )
+        save_dataset(dataset, config)
+    else:
+        batch_size = 10
+        num_batches = len(dataset) // batch_size + (1 if len(dataset) % batch_size != 0 else 0)
 
-    save_dataset(dataset, config)
+        for index in range(num_batches):
+            batch_start = index * batch_size
+            batch_end = min((index + 1) * batch_size, len(dataset))
+            batch = dataset.select(range(batch_start, batch_end))
+
+            batch = batch.map(
+                approach_fn,
+                batched=True,
+                batch_size=config.search_batch_size,
+                fn_kwargs={"config": config, "llm": llm, "prm": prm},
+                desc=f"Running search on batch {index + 1}/{num_batches}",
+                load_from_cache_file=False,
+            )
+
+            if config.approach != "estimate_difficulty":
+                batch = score(batch, config)
+
+            file_name = Path(f"{config.dataset_name}_{config.dataset_split}_{config.n}_{config.num_samples}_{config.approach}_stash-{index}.jsonl")
+        
+            save_dataset(batch, config, output_file=file_name)
+    
+        save_dataset(batch, config)
     logger.info("Done 🔥!")
 
 

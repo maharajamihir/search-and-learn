@@ -9,6 +9,7 @@ import msgpack
 from pathlib import Path
 import wandb
 from torch.utils.data import random_split
+from datasets import load_dataset
 
 
 
@@ -182,17 +183,10 @@ if __name__ == "__main__":
         raise ValueError(f"Unsupported method: {method}")
 
 
-    print(f"Loading {file_path}, this might take a while...")
-    file_size_in_bytes = Path(file_path).stat().st_size
-    if file_size_in_bytes >= 1e9:
-        file_size = file_size_in_bytes / 1e9
-        size_unit = "GB"
-    else:
-        file_size = file_size_in_bytes / 1e3
-        size_unit = "KB"
-    print(f"The size of the file is: {file_size:.2f} {size_unit}")
-    with open(file_path, 'rb') as f:
-        results = msgpack.unpackb(f.read())
+    print("Loading the train split of the 'mihirma/max-retrieval-dataset' from Hugging Face...")
+    dataset = load_dataset("mihirma/max-retrieval-dataset", split="train")
+    results = dataset.to_dict()
+    print(f"Loaded {len(results['problem'])} entries from the dataset.")
 
     texts = [r["problem"] for r in results]
     difficulty = [r["pass@1"] for r in results]

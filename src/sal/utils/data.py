@@ -27,7 +27,10 @@ logger = logging.getLogger()
 
 
 def get_dataset(config: Config) -> Dataset:
-    dataset = load_dataset(config.dataset_name, split=config.dataset_split)
+    if config.dataset_name == "openai/gsm8k":
+        dataset = load_dataset(config.dataset_name, "main", split=config.dataset_split)
+    else:
+        dataset = load_dataset(config.dataset_name, split=config.dataset_split)
 
     if config.dataset_start is not None and config.dataset_end is not None:
         dataset = dataset.select(range(config.dataset_start, config.dataset_end))
@@ -37,7 +40,7 @@ def get_dataset(config: Config) -> Dataset:
     return dataset
 
 
-def save_dataset(dataset, config):
+def save_dataset(dataset, config, output_file=None):
     if config.push_to_hub:
         # Since concurrent pushes can get rejected by the Hub, we make several attempts to push the dataset with try/except
         for _ in range(20):
@@ -71,11 +74,12 @@ def save_dataset(dataset, config):
         if config.output_dir is None:
             config.output_dir = f"data/{config.model_path}"
         Path(config.output_dir).mkdir(parents=True, exist_ok=True)
-        output_file = Path(f"{config.output_dir}/{config.approach}_completions.jsonl")
-        counter = 1
-        while output_file.exists():
-            output_file = Path(f"{config.output_dir}/{config.approach}_completions-{counter}.jsonl")
-            counter += 1
+        if not output_file: 
+            output_file = Path(f"{config.output_dir}/{config.approach}_completions.jsonl")
+            counter = 1
+            while output_file.exists():
+                output_file = Path(f"{config.output_dir}/{config.approach}_completions-{counter}.jsonl")
+                counter += 1
 
         dataset.to_json(output_file, lines=True)
         logger.info(f"Saved completions to {output_file}")
