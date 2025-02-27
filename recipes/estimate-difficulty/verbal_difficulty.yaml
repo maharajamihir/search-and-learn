@@ -1,0 +1,10 @@
+# refer to src/sal/config.py for more options
+
+approach: verbal_difficulty 
+n: 128 # n: 4
+search_batch_size: 1
+sort_completed: true
+filter_duplicates: true
+seed: 0
+max_tokens: 16
+system_prompt: "Provide the difficulty of the following math problem on a scale from 0-100. Only provide the difficulty of the problem. Do not attempt to solve it!\n\nRegardless of the problem, always answer with:\n\nDifficulty: difficulty.\n\nWhere [difficulty] is just your percieved difficulty score of the problem on a scale from 1-100."

@@ -21,7 +21,7 @@ from pathlib import Path
 
 from sal.config import Config
 from sal.models.reward_models import load_prm
-from sal.search import beam_search, best_of_n, dvts, estimate_difficulty, adaptive_best_of_n, load_adaptive_best_of_n_dataset
+from sal.search import beam_search, best_of_n, dvts, adaptive_best_of_n, load_adaptive_best_of_n_dataset
 from sal.utils.data import get_dataset, save_dataset
 from sal.utils.parser import H4ArgumentParser
 from sal.utils.score import score
@@ -63,7 +63,6 @@ def main():
         tensor_parallel_size=num_gpus,
     )
     prm = load_prm(config)
-    
     if config.approach == "estimate_difficulty":
         dataset = dataset.map(
             approach_fn,

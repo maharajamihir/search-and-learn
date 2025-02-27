@@ -1,0 +1,10 @@
+# refer to src/sal/config.py for more options
+
+approach: probability_of_difficult
+n: 128 # n: 4
+search_batch_size: 1
+sort_completed: true
+filter_duplicates: true
+seed: 0
+max_tokens: 16
+system_prompt: "Estimate whether the following problem is easy or hard. Only provide the final verdict on difficulty. Do not attempt to solve it!\n\nRegardless of the problem, always answer with:\n\nDifficulty: difficulty.\n\nWhere [difficulty] is just your percieved difficulty of the problem, which can take one of two values: 'easy' or 'hard'."

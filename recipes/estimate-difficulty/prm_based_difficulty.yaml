@@ -1,0 +1,9 @@
+# refer to src/sal/config.py for more options
+
+approach: prm_based_difficulty
+n: 128 # n: 4
+search_batch_size: 1
+sort_completed: true
+filter_duplicates: true
+seed: 0
+max_tokens: 2048
